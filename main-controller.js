@@ -1,5 +1,5 @@
 // main-controller.js
-// FIXED: Proper data validation and error handling
+// FIXED: Proper data validation and error handling for split functionality
 
 // Global variables
 let rawData = [];
@@ -17,7 +17,7 @@ function updateStats(data, pivots) {
     document.getElementById('pivotStats').style.display = 'grid';
 }
 
-// Process uploaded file and form bars
+// FIXED: Process uploaded file and form bars with data protection
 function formBarsInternal() {
     const fileInput = document.getElementById('csvFile');
     const timeframe = parseInt(document.getElementById('timeframe').value);
@@ -41,11 +41,14 @@ function formBarsInternal() {
             }
             
             // Convert to selected timeframe
-            window.chartData = convertToTimeframe(rawData, timeframe);
+            const convertedData = convertToTimeframe(rawData, timeframe);
             
-            if (window.chartData.length < 3) {
+            if (convertedData.length < 3) {
                 throw new Error('Not enough data after timeframe conversion. Need at least 3 bars.');
             }
+            
+            // FIXED: Store data securely to prevent corruption
+            window.chartData = JSON.parse(JSON.stringify(convertedData)); // Deep copy to prevent reference issues
             
             // Clear any existing pivots
             window.pivotData = { sph: [], spl: [], lph: [], lpl: [] };
@@ -62,12 +65,15 @@ function formBarsInternal() {
                 detectBtn.disabled = false;
             }
             
-            // Reset zoom and draw chart with bars only
-            if (window.resetZoomFunction) {
-                window.resetZoomFunction();
+            // FIXED: Don't call resetZoom immediately - it might corrupt data
+            // Just draw the chart directly
+            try {
+                drawChart(window.chartData, window.pivotData);
+                updateStats(window.chartData, window.pivotData);
+            } catch (chartError) {
+                console.error('Chart drawing error:', chartError);
+                // Chart error shouldn't prevent pivot detection
             }
-            drawChart(window.chartData, window.pivotData);
-            updateStats(window.chartData, window.pivotData);
             
             statusDiv.className = 'status success';
             statusDiv.textContent = `Successfully formed ${window.chartData.length} bars (${timeframeName}). Ready for pivot detection.`;
@@ -91,17 +97,16 @@ function formBarsInternal() {
     reader.readAsText(fileInput.files[0]);
 }
 
-// FIXED: Detect pivots with proper validation
+// FIXED: Detect pivots with bulletproof validation
 function detectPivotsInternal() {
     const statusDiv = document.getElementById('status');
     
-    console.log('detectPivotsInternal called');
+    console.log('=== PIVOT DETECTION START ===');
     console.log('barsFormed:', barsFormed);
-    console.log('window.chartData:', window.chartData);
-    console.log('window.chartData type:', typeof window.chartData);
-    console.log('window.chartData.length:', window.chartData ? window.chartData.length : 'undefined');
+    console.log('window.chartData exists:', !!window.chartData);
+    console.log('window.chartData length:', window.chartData ? window.chartData.length : 'undefined');
     
-    // FIXED: Comprehensive validation
+    // FIXED: Ultra-comprehensive validation
     if (!barsFormed) {
         statusDiv.className = 'status error';
         statusDiv.textContent = 'Please form bars first by clicking "Form Bars" button.';
@@ -109,24 +114,15 @@ function detectPivotsInternal() {
         return;
     }
     
-    if (!window.chartData) {
+    if (!window.chartData || !Array.isArray(window.chartData) || window.chartData.length < 3) {
         statusDiv.className = 'status error';
-        statusDiv.textContent = 'No chart data available. Please form bars first.';
+        statusDiv.textContent = 'Chart data corrupted. Please form bars again.';
         statusDiv.style.display = 'block';
-        return;
-    }
-    
-    if (!Array.isArray(window.chartData)) {
-        statusDiv.className = 'status error';
-        statusDiv.textContent = 'Invalid chart data format. Please form bars again.';
-        statusDiv.style.display = 'block';
-        return;
-    }
-    
-    if (window.chartData.length < 3) {
-        statusDiv.className = 'status error';
-        statusDiv.textContent = 'Not enough bars for pivot detection. Need at least 3 bars.';
-        statusDiv.style.display = 'block';
+        console.error('Chart data validation failed:', {
+            exists: !!window.chartData,
+            isArray: Array.isArray(window.chartData),
+            length: window.chartData ? window.chartData.length : 'undefined'
+        });
         return;
     }
     
@@ -135,23 +131,32 @@ function detectPivotsInternal() {
         statusDiv.textContent = 'Detecting pivots...';
         statusDiv.style.display = 'block';
         
-        console.log('About to call detectPivots with valid data:', window.chartData.length, 'bars');
+        console.log('About to call detectPivots with data length:', window.chartData.length);
         
-        // FIXED: Call detectPivots with proper error handling
-        window.pivotData = detectPivots(window.chartData);
+        // FIXED: Create a protected copy for pivot detection
+        const dataForPivots = JSON.parse(JSON.stringify(window.chartData));
+        console.log('Created data copy for pivot detection');
         
-        // Redraw chart with pivots
+        // Call detectPivots with the copy
+        window.pivotData = detectPivots(dataForPivots);
+        
+        console.log('Pivot detection completed successfully');
+        
+        // Validate pivot results
+        if (!window.pivotData || typeof window.pivotData !== 'object') {
+            throw new Error('Invalid pivot data returned');
+        }
+        
+        // Redraw chart with pivots (using original data, not the copy)
         drawChart(window.chartData, window.pivotData);
         updateStats(window.chartData, window.pivotData);
         
-        const totalPivots = window.pivotData.sph.length + window.pivotData.spl.length + 
-                           window.pivotData.lph.length + window.pivotData.lpl.length;
+        const totalPivots = (window.pivotData.sph?.length || 0) + (window.pivotData.spl?.length || 0) + 
+                           (window.pivotData.lph?.length || 0) + (window.pivotData.lpl?.length || 0);
         
         statusDiv.className = 'status success';
-        statusDiv.textContent = `Successfully detected ${totalPivots} pivot points (SPH: ${window.pivotData.sph.length}, SPL: ${window.pivotData.spl.length}, LPH: ${window.pivotData.lph.length}, LPL: ${window.pivotData.lpl.length}).`;
+        statusDiv.textContent = `Successfully detected ${totalPivots} pivot points (SPH: ${window.pivotData.sph?.length || 0}, SPL: ${window.pivotData.spl?.length || 0}, LPH: ${window.pivotData.lph?.length || 0}, LPL: ${window.pivotData.lpl?.length || 0}).`;
         statusDiv.style.display = 'block';
-        
-        console.log('Pivot detection completed successfully');
         
     } catch (error) {
         statusDiv.className = 'status error';
@@ -219,7 +224,7 @@ function showTooltip(x, y, barData) {
         <div>High: ${barData.data.high.toFixed(2)}</div>
         <div>Low: ${barData.data.low.toFixed(2)}</div>
         <div>Close: ${barData.data.close.toFixed(2)}</div>
-        <div>Time: ${new Date(barData.data.timestamp).toLocaleString()}</div>
+        <div>Time: ${new Date(barData.data.datetime).toLocaleString()}</div>
     `;
     
     // Position tooltip
