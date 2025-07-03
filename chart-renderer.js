@@ -1,5 +1,5 @@
 // chart-renderer.js
-// Handles chart drawing and visualization
+// Updated chart renderer with tooltip support
 
 let canvasWidth = 1200;
 let canvasHeight = 700;
@@ -8,6 +8,18 @@ let panY = 0;
 let isDragging = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+
+// Expose pan variables globally for tooltip calculations
+window.panX = panX;
+window.panY = panY;
+window.isDragging = isDragging;
+
+// Update global pan variables when they change
+function updateGlobalPanVars() {
+    window.panX = panX;
+    window.panY = panY;
+    window.isDragging = isDragging;
+}
 
 // Draw chart
 function drawChart(data, pivots) {
@@ -77,7 +89,7 @@ function drawChart(data, pivots) {
     for (let i = 0; i < data.length; i += timeSteps) {
         const x = margin.left + (i * barWidth);
         
-        ctx.strokeStyle = '#f0f0f0';
+        ctx.strokeStyle = '#e0e0e0';
         ctx.beginPath();
         ctx.moveTo(x, margin.top);
         ctx.lineTo(x, margin.top + chartHeight);
@@ -85,71 +97,66 @@ function drawChart(data, pivots) {
         
         // Time labels
         ctx.fillStyle = '#666';
-        ctx.font = '10px Arial';
+        ctx.font = '11px Arial';
         ctx.textAlign = 'center';
-        ctx.save();
-        ctx.translate(x, margin.top + chartHeight + 15);
-        ctx.rotate(-Math.PI / 4);
-        ctx.fillText(formatTime(data[i].date), 0, 0);
-        ctx.restore();
-        
-        // Date labels (less frequent)
-        if (i % (timeSteps * 3) === 0) {
-            ctx.fillText(formatDate(data[i].date), x, margin.top + chartHeight + 40);
-        }
+        const date = new Date(data[i].timestamp);
+        ctx.fillText(date.toLocaleDateString(), x, margin.top + chartHeight + 20);
     }
     
     // Draw candlesticks
-    data.forEach((candle, index) => {
-        const x = margin.left + (index * barWidth);
-        const openY = margin.top + ((adjustedMaxPrice - candle.open) / priceRange) * chartHeight;
-        const closeY = margin.top + ((adjustedMaxPrice - candle.close) / priceRange) * chartHeight;
-        const highY = margin.top + ((adjustedMaxPrice - candle.high) / priceRange) * chartHeight;
-        const lowY = margin.top + ((adjustedMaxPrice - candle.low) / priceRange) * chartHeight;
+    for (let i = 0; i < data.length; i++) {
+        const bar = data[i];
+        const x = margin.left + (i * barWidth);
+        const openY = margin.top + ((adjustedMaxPrice - bar.open) / priceRange) * chartHeight;
+        const closeY = margin.top + ((adjustedMaxPrice - bar.close) / priceRange) * chartHeight;
+        const highY = margin.top + ((adjustedMaxPrice - bar.high) / priceRange) * chartHeight;
+        const lowY = margin.top + ((adjustedMaxPrice - bar.low) / priceRange) * chartHeight;
         
-        const isGreen = candle.close >= candle.open;
-        ctx.strokeStyle = isGreen ? '#28a745' : '#dc3545';
-        ctx.fillStyle = isGreen ? '#28a745' : '#dc3545';
-        ctx.lineWidth = 1;
+        // Determine color
+        const isGreen = bar.close > bar.open;
+        ctx.fillStyle = isGreen ? '#4CAF50' : '#F44336';
+        ctx.strokeStyle = isGreen ? '#4CAF50' : '#F44336';
         
         // Draw high-low line
+        ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(x + barWidth/2, highY);
-        ctx.lineTo(x + barWidth/2, lowY);
+        ctx.moveTo(x + barWidth / 2, highY);
+        ctx.lineTo(x + barWidth / 2, lowY);
         ctx.stroke();
         
         // Draw body
+        const bodyTop = Math.min(openY, closeY);
         const bodyHeight = Math.abs(closeY - openY);
-        const bodyY = Math.min(openY, closeY);
-        const bodyWidth = Math.max(1, barWidth - 2);
-        
-        ctx.fillRect(x + 1, bodyY, bodyWidth, Math.max(1, bodyHeight));
-    });
+        ctx.fillRect(x + 1, bodyTop, Math.max(1, barWidth - 2), Math.max(1, bodyHeight));
+    }
     
-    // Draw pivot points
-    function drawPivot(indices, color, label, isHigh = true) {
-        indices.forEach(idx => {
-            if (idx < data.length) {
-                const x = margin.left + (idx * barWidth) + barWidth/2;
-                const price = isHigh ? data[idx].high : data[idx].low;
+    // Draw pivots
+    function drawPivot(pivotIndices, color, label, isHigh) {
+        ctx.fillStyle = color;
+        ctx.strokeStyle = color;
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        
+        pivotIndices.forEach(index => {
+            if (index < data.length) {
+                const bar = data[index];
+                const x = margin.left + (index * barWidth) + barWidth / 2;
+                const price = isHigh ? bar.high : bar.low;
                 const y = margin.top + ((adjustedMaxPrice - price) / priceRange) * chartHeight;
                 
-                // Draw circle
-                ctx.fillStyle = color;
+                // Draw marker
                 ctx.beginPath();
                 ctx.arc(x, y, 4, 0, 2 * Math.PI);
                 ctx.fill();
                 
-                // Draw border
-                ctx.strokeStyle = '#ffffff';
-                ctx.lineWidth = 1;
-                ctx.stroke();
+                // Draw label
+                const labelY = isHigh ? y - 15 : y + 25;
+                ctx.fillText(label, x, labelY);
                 
-                // Label
-                ctx.fillStyle = color;
-                ctx.font = 'bold 10px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(label, x, y + (isHigh ? -12 : 18));
+                // Draw index number
+                ctx.font = '10px Arial';
+                ctx.fillText(index.toString(), x, isHigh ? y - 25 : y + 35);
+                ctx.font = '12px Arial';
             }
         });
     }
@@ -189,6 +196,7 @@ function setupChartEventListeners() {
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
         canvas.style.cursor = 'grabbing';
+        updateGlobalPanVars();
     });
     
     canvas.addEventListener('mousemove', function(e) {
@@ -202,6 +210,8 @@ function setupChartEventListeners() {
             lastMouseX = e.clientX;
             lastMouseY = e.clientY;
             
+            updateGlobalPanVars();
+            
             if (window.chartData && window.chartData.length > 0) {
                 drawChart(window.chartData, window.pivotData);
             }
@@ -211,11 +221,13 @@ function setupChartEventListeners() {
     canvas.addEventListener('mouseup', function() {
         isDragging = false;
         canvas.style.cursor = 'grab';
+        updateGlobalPanVars();
     });
     
     canvas.addEventListener('mouseleave', function() {
         isDragging = false;
         canvas.style.cursor = 'grab';
+        updateGlobalPanVars();
     });
     
     // Wheel event for zooming
@@ -252,6 +264,8 @@ function resetZoomInternal() {
     document.getElementById('vScale').value = 1;
     document.getElementById('hZoomValue').textContent = '1.0x';
     document.getElementById('vScaleValue').textContent = '1.0x';
+    
+    updateGlobalPanVars();
     
     if (window.chartData && window.chartData.length > 0) {
         drawChart(window.chartData, window.pivotData);

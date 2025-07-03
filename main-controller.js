@@ -1,10 +1,11 @@
 // main-controller.js
-// Main application controller and file processing
+// Updated main application controller with separate bar formation and pivot detection
 
 // Global variables
 let rawData = [];
 window.chartData = [];
 window.pivotData = { sph: [], spl: [], lph: [], lpl: [] };
+let barsFormed = false;
 
 // Update statistics
 function updateStats(data, pivots) {
@@ -16,8 +17,8 @@ function updateStats(data, pivots) {
     document.getElementById('pivotStats').style.display = 'grid';
 }
 
-// Process uploaded file
-function processFileInternal() {
+// Process uploaded file and form bars
+function formBarsInternal() {
     const fileInput = document.getElementById('csvFile');
     const timeframe = parseInt(document.getElementById('timeframe').value);
     const statusDiv = document.getElementById('status');
@@ -46,15 +47,19 @@ function processFileInternal() {
                 throw new Error('Not enough data after timeframe conversion. Need at least 3 bars.');
             }
             
-            // Detect pivots
-            window.pivotData = detectPivots(window.chartData);
+            // Clear any existing pivots
+            window.pivotData = { sph: [], spl: [], lph: [], lpl: [] };
+            barsFormed = true;
             
             // Update timeframe info
             const timeframeName = document.getElementById('timeframe').selectedOptions[0].text;
             document.getElementById('timeframeInfo').textContent = 
                 `Converted ${rawData.length} ticks to ${window.chartData.length} ${timeframeName} bars`;
             
-            // Reset zoom and draw
+            // Enable pivot detection button
+            document.getElementById('detectPivotsBtn').disabled = false;
+            
+            // Reset zoom and draw chart with bars only
             if (window.resetZoomFunction) {
                 window.resetZoomFunction();
             }
@@ -62,26 +67,172 @@ function processFileInternal() {
             updateStats(window.chartData, window.pivotData);
             
             statusDiv.className = 'status success';
-            statusDiv.textContent = `Successfully processed ${window.chartData.length} bars (${timeframeName}) with ${window.pivotData.sph.length + window.pivotData.spl.length + window.pivotData.lph.length + window.pivotData.lpl.length} pivot points detected.`;
+            statusDiv.textContent = `Successfully formed ${window.chartData.length} bars (${timeframeName}). Ready for pivot detection.`;
             statusDiv.style.display = 'block';
             
         } catch (error) {
             statusDiv.className = 'status error';
-            statusDiv.textContent = `Error processing file: ${error.message}`;
+            statusDiv.textContent = `Error forming bars: ${error.message}`;
             statusDiv.style.display = 'block';
-            console.error('Processing error:', error);
+            console.error('Bar formation error:', error);
+            barsFormed = false;
+            document.getElementById('detectPivotsBtn').disabled = true;
         }
     };
     
     reader.readAsText(fileInput.files[0]);
 }
 
-// Expose function globally
-window.processFileFunction = processFileInternal;
+// Detect pivots on formed bars
+function detectPivotsInternal() {
+    const statusDiv = document.getElementById('status');
+    
+    if (!barsFormed || !window.chartData || window.chartData.length < 3) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'Please form bars first before detecting pivots.';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    try {
+        statusDiv.className = 'status info';
+        statusDiv.textContent = 'Detecting pivots...';
+        statusDiv.style.display = 'block';
+        
+        // Detect pivots
+        window.pivotData = detectPivots(window.chartData);
+        
+        // Redraw chart with pivots
+        drawChart(window.chartData, window.pivotData);
+        updateStats(window.chartData, window.pivotData);
+        
+        const totalPivots = window.pivotData.sph.length + window.pivotData.spl.length + 
+                           window.pivotData.lph.length + window.pivotData.lpl.length;
+        
+        statusDiv.className = 'status success';
+        statusDiv.textContent = `Successfully detected ${totalPivots} pivot points (SPH: ${window.pivotData.sph.length}, SPL: ${window.pivotData.spl.length}, LPH: ${window.pivotData.lph.length}, LPL: ${window.pivotData.lpl.length}).`;
+        statusDiv.style.display = 'block';
+        
+    } catch (error) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = `Error detecting pivots: ${error.message}`;
+        statusDiv.style.display = 'block';
+        console.error('Pivot detection error:', error);
+    }
+}
+
+// Get bar data at specific canvas coordinates
+function getBarAtPosition(x, y) {
+    if (!window.chartData || window.chartData.length === 0) return null;
+    
+    const canvas = document.getElementById('chart');
+    const hZoom = parseFloat(document.getElementById('hZoom').value);
+    
+    // Chart dimensions
+    const margin = { top: 30, right: 20, bottom: 80, left: 80 };
+    const chartWidth = canvas.width - margin.left - margin.right;
+    
+    // Calculate bar width with zoom
+    const barWidth = Math.max(2, (chartWidth / window.chartData.length) * hZoom);
+    
+    // Adjust for panning
+    const adjustedX = x - window.panX - margin.left;
+    
+    // Calculate bar index
+    const barIndex = Math.floor(adjustedX / barWidth);
+    
+    if (barIndex >= 0 && barIndex < window.chartData.length) {
+        return {
+            index: barIndex,
+            data: window.chartData[barIndex]
+        };
+    }
+    
+    return null;
+}
+
+// Show tooltip with OHLC data
+function showTooltip(x, y, barData) {
+    let tooltip = document.getElementById('chartTooltip');
+    
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'chartTooltip';
+        tooltip.style.cssText = `
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-family: monospace;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+        `;
+        document.body.appendChild(tooltip);
+    }
+    
+    tooltip.innerHTML = `
+        <div><strong>Bar ${barData.index}</strong></div>
+        <div>Open: ${barData.data.open.toFixed(2)}</div>
+        <div>High: ${barData.data.high.toFixed(2)}</div>
+        <div>Low: ${barData.data.low.toFixed(2)}</div>
+        <div>Close: ${barData.data.close.toFixed(2)}</div>
+        <div>Time: ${new Date(barData.data.timestamp).toLocaleString()}</div>
+    `;
+    
+    // Position tooltip
+    tooltip.style.left = (x + 10) + 'px';
+    tooltip.style.top = (y - 10) + 'px';
+    tooltip.style.display = 'block';
+}
+
+// Hide tooltip
+function hideTooltip() {
+    const tooltip = document.getElementById('chartTooltip');
+    if (tooltip) {
+        tooltip.style.display = 'none';
+    }
+}
+
+// Setup chart mouse events for tooltips
+function setupChartTooltips() {
+    const canvas = document.getElementById('chart');
+    
+    canvas.addEventListener('mousemove', function(e) {
+        if (!window.isDragging) {
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const y = e.clientY - rect.top;
+            
+            const barData = getBarAtPosition(x, y);
+            
+            if (barData) {
+                showTooltip(e.clientX, e.clientY, barData);
+            } else {
+                hideTooltip();
+            }
+        }
+    });
+    
+    canvas.addEventListener('mouseleave', function() {
+        hideTooltip();
+    });
+}
+
+// Expose functions globally
+window.formBarsFunction = formBarsInternal;
+window.detectPivotsFunction = detectPivotsInternal;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
     setupChartEventListeners();
+    setupChartTooltips();
+    
+    // Initially disable pivot detection button
+    document.getElementById('detectPivotsBtn').disabled = true;
+    
     if (window.fitToScreenFunction) {
         window.fitToScreenFunction();
     }
@@ -95,5 +246,5 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 100);
     });
     
-    console.log('NIFTY Pivot Detector initialized');
+    console.log('NIFTY Pivot Detector initialized with separate processes');
 });
