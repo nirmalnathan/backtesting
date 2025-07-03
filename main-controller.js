@@ -1,5 +1,5 @@
 // main-controller.js
-// Updated main application controller with separate bar formation and pivot detection
+// FIXED: Proper data validation and error handling
 
 // Global variables
 let rawData = [];
@@ -57,7 +57,10 @@ function formBarsInternal() {
                 `Converted ${rawData.length} ticks to ${window.chartData.length} ${timeframeName} bars`;
             
             // Enable pivot detection button
-            document.getElementById('detectPivotsBtn').disabled = false;
+            const detectBtn = document.getElementById('detectPivotsBtn');
+            if (detectBtn) {
+                detectBtn.disabled = false;
+            }
             
             // Reset zoom and draw chart with bars only
             if (window.resetZoomFunction) {
@@ -70,26 +73,59 @@ function formBarsInternal() {
             statusDiv.textContent = `Successfully formed ${window.chartData.length} bars (${timeframeName}). Ready for pivot detection.`;
             statusDiv.style.display = 'block';
             
+            console.log('Bars formed successfully:', window.chartData.length, 'bars');
+            
         } catch (error) {
             statusDiv.className = 'status error';
             statusDiv.textContent = `Error forming bars: ${error.message}`;
             statusDiv.style.display = 'block';
             console.error('Bar formation error:', error);
             barsFormed = false;
-            document.getElementById('detectPivotsBtn').disabled = true;
+            const detectBtn = document.getElementById('detectPivotsBtn');
+            if (detectBtn) {
+                detectBtn.disabled = true;
+            }
         }
     };
     
     reader.readAsText(fileInput.files[0]);
 }
 
-// Detect pivots on formed bars
+// FIXED: Detect pivots with proper validation
 function detectPivotsInternal() {
     const statusDiv = document.getElementById('status');
     
-    if (!barsFormed || !window.chartData || window.chartData.length < 3) {
+    console.log('detectPivotsInternal called');
+    console.log('barsFormed:', barsFormed);
+    console.log('window.chartData:', window.chartData);
+    console.log('window.chartData type:', typeof window.chartData);
+    console.log('window.chartData.length:', window.chartData ? window.chartData.length : 'undefined');
+    
+    // FIXED: Comprehensive validation
+    if (!barsFormed) {
         statusDiv.className = 'status error';
-        statusDiv.textContent = 'Please form bars first before detecting pivots.';
+        statusDiv.textContent = 'Please form bars first by clicking "Form Bars" button.';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    if (!window.chartData) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'No chart data available. Please form bars first.';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    if (!Array.isArray(window.chartData)) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'Invalid chart data format. Please form bars again.';
+        statusDiv.style.display = 'block';
+        return;
+    }
+    
+    if (window.chartData.length < 3) {
+        statusDiv.className = 'status error';
+        statusDiv.textContent = 'Not enough bars for pivot detection. Need at least 3 bars.';
         statusDiv.style.display = 'block';
         return;
     }
@@ -99,7 +135,9 @@ function detectPivotsInternal() {
         statusDiv.textContent = 'Detecting pivots...';
         statusDiv.style.display = 'block';
         
-        // Detect pivots
+        console.log('About to call detectPivots with valid data:', window.chartData.length, 'bars');
+        
+        // FIXED: Call detectPivots with proper error handling
         window.pivotData = detectPivots(window.chartData);
         
         // Redraw chart with pivots
@@ -112,6 +150,8 @@ function detectPivotsInternal() {
         statusDiv.className = 'status success';
         statusDiv.textContent = `Successfully detected ${totalPivots} pivot points (SPH: ${window.pivotData.sph.length}, SPL: ${window.pivotData.spl.length}, LPH: ${window.pivotData.lph.length}, LPL: ${window.pivotData.lpl.length}).`;
         statusDiv.style.display = 'block';
+        
+        console.log('Pivot detection completed successfully');
         
     } catch (error) {
         statusDiv.className = 'status error';
@@ -227,11 +267,17 @@ window.detectPivotsFunction = detectPivotsInternal;
 
 // Initialize application
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('Initializing NIFTY Pivot Detector...');
+    
     setupChartEventListeners();
     setupChartTooltips();
     
     // Initially disable pivot detection button
-    document.getElementById('detectPivotsBtn').disabled = true;
+    const detectBtn = document.getElementById('detectPivotsBtn');
+    if (detectBtn) {
+        detectBtn.disabled = true;
+        console.log('Pivot detection button disabled initially');
+    }
     
     if (window.fitToScreenFunction) {
         window.fitToScreenFunction();

@@ -1,5 +1,5 @@
 // chart-renderer.js
-// Updated chart renderer with tooltip support
+// Fixed chart renderer with proper event handling
 
 let canvasWidth = 1200;
 let canvasHeight = 700;
@@ -230,7 +230,7 @@ function setupChartEventListeners() {
         updateGlobalPanVars();
     });
     
-    // Wheel event for zooming
+    // FIXED: Wheel event with proper passive handling
     canvas.addEventListener('wheel', function(e) {
         e.preventDefault();
         
@@ -253,7 +253,7 @@ function setupChartEventListeners() {
         if (window.chartData && window.chartData.length > 0) {
             drawChart(window.chartData, window.pivotData);
         }
-    });
+    }, { passive: false }); // Explicitly mark as non-passive since we need preventDefault
 }
 
 // Reset zoom and pan
