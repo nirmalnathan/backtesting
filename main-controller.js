@@ -1,11 +1,42 @@
 // main-controller.js
-// FIXED: Proper data validation and error handling for split functionality
+// FIXED: Proper data validation and error handling for split functionality with debug protection
 
 // Global variables
 let rawData = [];
-window.chartData = [];
-window.pivotData = { sph: [], spl: [], lph: [], lpl: [] };
 let barsFormed = false;
+
+// DEBUGGING: Data protector to catch when chartData gets cleared
+let originalChartData = [];
+let originalPivotData = { sph: [], spl: [], lph: [], lpl: [] };
+
+// Override window.chartData with a getter/setter to track changes
+Object.defineProperty(window, 'chartData', {
+    get: function() {
+        return originalChartData;
+    },
+    set: function(value) {
+        console.log('=== CHARTDATA CHANGE DETECTED ===');
+        console.log('Previous value:', originalChartData ? originalChartData.length : 'null/undefined');
+        console.log('New value:', value ? value.length : 'null/undefined');
+        console.log('Stack trace:', new Error().stack);
+        console.log('=== END CHARTDATA CHANGE ===');
+        originalChartData = value;
+    },
+    configurable: true
+});
+
+// Override window.pivotData with a getter/setter to track changes
+Object.defineProperty(window, 'pivotData', {
+    get: function() {
+        return originalPivotData;
+    },
+    set: function(value) {
+        console.log('=== PIVOTDATA CHANGE DETECTED ===');
+        console.log('New pivot data:', value);
+        originalPivotData = value;
+    },
+    configurable: true
+});
 
 // Update statistics
 function updateStats(data, pivots) {
@@ -48,7 +79,9 @@ function formBarsInternal() {
             }
             
             // FIXED: Store data securely to prevent corruption
+            console.log('About to set window.chartData with', convertedData.length, 'bars');
             window.chartData = JSON.parse(JSON.stringify(convertedData)); // Deep copy to prevent reference issues
+            console.log('window.chartData set successfully, length:', window.chartData.length);
             
             // Clear any existing pivots
             window.pivotData = { sph: [], spl: [], lph: [], lpl: [] };
@@ -67,9 +100,12 @@ function formBarsInternal() {
             
             // FIXED: Don't call resetZoom immediately - it might corrupt data
             // Just draw the chart directly
+            console.log('About to draw chart. Current window.chartData.length:', window.chartData.length);
             try {
                 drawChart(window.chartData, window.pivotData);
+                console.log('Chart drawn successfully. Current window.chartData.length:', window.chartData.length);
                 updateStats(window.chartData, window.pivotData);
+                console.log('Stats updated. Current window.chartData.length:', window.chartData.length);
             } catch (chartError) {
                 console.error('Chart drawing error:', chartError);
                 // Chart error shouldn't prevent pivot detection
@@ -80,6 +116,7 @@ function formBarsInternal() {
             statusDiv.style.display = 'block';
             
             console.log('Bars formed successfully:', window.chartData.length, 'bars');
+            console.log('Final check - window.chartData.length:', window.chartData.length);
             
         } catch (error) {
             statusDiv.className = 'status error';
@@ -148,6 +185,7 @@ function detectPivotsInternal() {
         }
         
         // Redraw chart with pivots (using original data, not the copy)
+        console.log('About to redraw chart with pivots. window.chartData.length:', window.chartData.length);
         drawChart(window.chartData, window.pivotData);
         updateStats(window.chartData, window.pivotData);
         
@@ -284,9 +322,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('Pivot detection button disabled initially');
     }
     
-    if (window.fitToScreenFunction) {
-        window.fitToScreenFunction();
-    }
+    // FIXED: Commenting out fitToScreen call during initialization as it might corrupt data
+    // if (window.fitToScreenFunction) {
+    //     window.fitToScreenFunction();
+    // }
     
     // Handle window resize
     window.addEventListener('resize', function() {
