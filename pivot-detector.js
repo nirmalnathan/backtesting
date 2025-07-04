@@ -1,280 +1,121 @@
-// pivot-detector-fixed.js
-// FIXED: Test each anchor against ALL remaining bars before moving to next anchor
+// pivot-detector-complete-fixed.js
+// COMPLETE FIX: Two-stage optimization with parallel anchor testing and range relocation
 
 function detectPivots(data) {
-if (!data || !Array.isArray(data) || data.length < 3) {
+    if (!data || !Array.isArray(data) || data.length < 3) {
         console.warn('Invalid data provided to detectPivots:', data);
         return { sph: [], spl: [], lph: [], lpl: [] };
     }
     
-    console.log(`=== STARTING METHODICAL PIVOT DETECTION ON ${data.length} BARS ===`);
+    console.log(`=== STARTING COMPLETE PIVOT DETECTION ON ${data.length} BARS ===`);
     
     const confirmedPivots = [];
     let currentSearchIndex = 0;
-    let lastPivotType = null; // Track last confirmed pivot type for alternation
+    let lastPivotType = null;
     
-    // Phase 1: Systematic bar-by-bar detection with proper alternation
+    // Phase 1: Parallel anchor testing with immediate range optimization
     while (currentSearchIndex < data.length - 2) {
-        console.log(`\n--- Testing from search index ${currentSearchIndex} ---`);
-        console.log(`Last pivot type: ${lastPivotType || 'NONE'}`);
+        console.log(`\n--- Starting search from index ${currentSearchIndex} ---`);
+        console.log(`Looking for: ${lastPivotType === null ? 'SPH (first pivot)' : (lastPivotType === 'sph' ? 'SPL' : 'SPH')}`);
         
+        let potentialAnchors = [];
         let patternFound = false;
-        let nextSearchIndex = currentSearchIndex + 1; // Default increment
+        let pivotResult = null;
         
-        // FIXED: Test each bar starting from currentSearchIndex as potential Anchor
-        for (let anchorIdx = currentSearchIndex; anchorIdx < data.length - 2; anchorIdx++) {
-            console.log(`\nTesting Bar ${anchorIdx} as Anchor:`);
-            const anchor = data[anchorIdx];
-            console.log(`  Anchor ${anchorIdx}: Open=${anchor.open.toFixed(2)}, High=${anchor.high.toFixed(2)}, Low=${anchor.low.toFixed(2)}, Close=${anchor.close.toFixed(2)}`);
+        // Add first anchor to start testing
+        potentialAnchors.push(currentSearchIndex);
+        console.log(`Added initial anchor: Bar ${currentSearchIndex}`);
+        
+        // Test each subsequent bar
+        for (let currentBarIdx = currentSearchIndex + 1; currentBarIdx < data.length && !patternFound; currentBarIdx++) {
+            console.log(`\n  Processing Bar ${currentBarIdx}:`);
             
-            let anchorFoundPattern = false; // Track if THIS anchor found a pattern
-            
-            // Look for SPH pattern (only if we need SPH for alternation OR no previous pivot)
-            if (lastPivotType !== 'sph') {
-                console.log(`  Looking for SPH pattern (alternation allows SPH)...`);
-                let sphB1 = -1, sphB2 = -1;
+            // Test all existing potential anchors with current bar
+            for (let i = 0; i < potentialAnchors.length && !patternFound; i++) {
+                const anchorIdx = potentialAnchors[i];
                 
-                // FIXED: Find B1 for SPH: test against ALL remaining bars
-                for (let i = anchorIdx + 1; i < data.length; i++) {
-                    const bar = data[i];
-                    console.log(`    Checking Bar ${i}: low=${bar.low.toFixed(2)} vs anchor.low=${anchor.low.toFixed(2)}, close=${bar.close.toFixed(2)} vs anchor.close=${anchor.close.toFixed(2)}`);
-                    
-                    if (bar.low < anchor.low && bar.close < anchor.close) {
-                        sphB1 = i;
-                        console.log(`    ✓ Found SPH B1 at Bar ${i}`);
-                        break;
-                    } else {
-                        console.log(`    ✗ Bar ${i} doesn't qualify for SPH B1`);
-                    }
-                }
+                // Determine what pivot type we're looking for
+                const lookingForSPH = (lastPivotType === null || lastPivotType === 'spl');
                 
-                // FIXED: Find B2 for SPH: test against ALL remaining bars after B1
-                if (sphB1 !== -1) {
-                    console.log(`  Looking for SPH B2 after B1=${sphB1}...`);
-                    for (let i = sphB1 + 1; i < data.length; i++) {
-                        const bar = data[i];
-                        console.log(`    Checking Bar ${i}: low=${bar.low.toFixed(2)} vs anchor.low=${anchor.low.toFixed(2)}, close=${bar.close.toFixed(2)} vs anchor.close=${anchor.close.toFixed(2)}`);
+                if (lookingForSPH) {
+                    // Test for SPH pattern
+                    const sphResult = testSPHPattern(data, anchorIdx, currentBarIdx);
+                    if (sphResult.complete) {
+                        console.log(`    ✓ SPH PATTERN FOUND: Anchor=${anchorIdx}, B1=${sphResult.b1}, B2=${sphResult.b2}`);
+                        console.log(`    ✓ SPH placed at Bar ${sphResult.pivotIdx} (highest in range ${anchorIdx}-${sphResult.b2})`);
                         
-                        if (bar.low < anchor.low && bar.close < anchor.close) {
-                            sphB2 = i;
-                            console.log(`    ✓ Found SPH B2 at Bar ${i}`);
-                            break;
-                        } else {
-                            console.log(`    ✗ Bar ${i} doesn't qualify for SPH B2`);
-                        }
+                        pivotResult = {
+                            type: 'sph',
+                            pivotIdx: sphResult.pivotIdx,
+                            price: sphResult.price,
+                            anchor: anchorIdx,
+                            b1: sphResult.b1,
+                            b2: sphResult.b2
+                        };
+                        patternFound = true;
                     }
-                }
-                
-                // Check if SPH pattern is complete
-                if (sphB1 !== -1 && sphB2 !== -1) {
-                    const candidates = [
-                        { idx: anchorIdx, price: anchor.high, label: 'Anchor' },
-                        { idx: sphB1, price: data[sphB1].high, label: 'B1' },
-                        { idx: sphB2, price: data[sphB2].high, label: 'B2' }
-                    ];
-                    
-                    console.log(`  SPH Pattern Complete! Candidates:`);
-                    candidates.forEach(c => console.log(`    ${c.label} Bar ${c.idx}: high=${c.price.toFixed(2)}`));
-                    
-                    const sphBar = candidates.reduce((max, bar) => bar.price > max.price ? bar : max);
-                    console.log(`  ✓ SPH CONFIRMED: Bar ${sphBar.idx} with high=${sphBar.price.toFixed(2)}`);
-                    
-                    confirmedPivots.push({
-                        type: 'sph',
-                        pivotIdx: sphBar.idx,
-                        price: sphBar.price,
-                        anchor: anchorIdx,
-                        b1: sphB1,
-                        b2: sphB2
-                    });
-                    
-                    lastPivotType = 'sph';
-                    nextSearchIndex = sphB2;
-                    patternFound = true;
-                    anchorFoundPattern = true; // This anchor found a pattern
-                    console.log(`  Next search will start from Bar ${nextSearchIndex} (B2 position)`);
-                    console.log(`  Last pivot type updated to: ${lastPivotType}`);
                 } else {
-                    console.log(`  SPH pattern incomplete: B1=${sphB1}, B2=${sphB2}`);
-                }
-            } else {
-                console.log(`  Skipping SPH pattern (alternation requires SPL next)`);
-            }
-            
-            // Only look for SPL if SPH wasn't found with this anchor
-            if (!anchorFoundPattern && lastPivotType !== 'spl') {
-                console.log(`  Looking for SPL pattern (alternation allows SPL)...`);
-                let splB1 = -1, splB2 = -1;
-                
-                // FIXED: Find B1 for SPL: test against ALL remaining bars
-                for (let i = anchorIdx + 1; i < data.length; i++) {
-                    const bar = data[i];
-                    console.log(`    Checking Bar ${i}: high=${bar.high.toFixed(2)} vs anchor.high=${anchor.high.toFixed(2)}, close=${bar.close.toFixed(2)} vs anchor.close=${anchor.close.toFixed(2)}`);
-                    
-                    if (bar.high > anchor.high && bar.close > anchor.close) {
-                        splB1 = i;
-                        console.log(`    ✓ Found SPL B1 at Bar ${i}`);
-                        break;
-                    } else {
-                        console.log(`    ✗ Bar ${i} doesn't qualify for SPL B1`);
-                    }
-                }
-                
-                // FIXED: Find B2 for SPL: test against ALL remaining bars after B1
-                if (splB1 !== -1) {
-                    console.log(`  Looking for SPL B2 after B1=${splB1}...`);
-                    for (let i = splB1 + 1; i < data.length; i++) {
-                        const bar = data[i];
-                        console.log(`    Checking Bar ${i}: high=${bar.high.toFixed(2)} vs anchor.high=${anchor.high.toFixed(2)}, close=${bar.close.toFixed(2)} vs anchor.close=${anchor.close.toFixed(2)}`);
+                    // Test for SPL pattern
+                    const splResult = testSPLPattern(data, anchorIdx, currentBarIdx);
+                    if (splResult.complete) {
+                        console.log(`    ✓ SPL PATTERN FOUND: Anchor=${anchorIdx}, B1=${splResult.b1}, B2=${splResult.b2}`);
+                        console.log(`    ✓ SPL placed at Bar ${splResult.pivotIdx} (lowest in range ${anchorIdx}-${splResult.b2})`);
                         
-                        if (bar.high > anchor.high && bar.close > anchor.close) {
-                            splB2 = i;
-                            console.log(`    ✓ Found SPL B2 at Bar ${i}`);
-                            break;
-                        } else {
-                            console.log(`    ✗ Bar ${i} doesn't qualify for SPL B2`);
-                        }
+                        pivotResult = {
+                            type: 'spl',
+                            pivotIdx: splResult.pivotIdx,
+                            price: splResult.price,
+                            anchor: anchorIdx,
+                            b1: splResult.b1,
+                            b2: splResult.b2
+                        };
+                        patternFound = true;
                     }
                 }
-                
-                // Check if SPL pattern is complete
-                if (splB1 !== -1 && splB2 !== -1) {
-                    const candidates = [
-                        { idx: anchorIdx, price: anchor.low, label: 'Anchor' },
-                        { idx: splB1, price: data[splB1].low, label: 'B1' },
-                        { idx: splB2, price: data[splB2].low, label: 'B2' }
-                    ];
-                    
-                    console.log(`  SPL Pattern Complete! Candidates:`);
-                    candidates.forEach(c => console.log(`    ${c.label} Bar ${c.idx}: low=${c.price.toFixed(2)}`));
-                    
-                    const splBar = candidates.reduce((min, bar) => bar.price < min.price ? bar : min);
-                    console.log(`  ✓ SPL CONFIRMED: Bar ${splBar.idx} with low=${splBar.price.toFixed(2)}`);
-                    
-                    confirmedPivots.push({
-                        type: 'spl',
-                        pivotIdx: splBar.idx,
-                        price: splBar.price,
-                        anchor: anchorIdx,
-                        b1: splB1,
-                        b2: splB2
-                    });
-                    
-                    lastPivotType = 'spl';
-                    nextSearchIndex = splB2;
-                    patternFound = true;
-                    anchorFoundPattern = true; // This anchor found a pattern
-                    console.log(`  Next search will start from Bar ${nextSearchIndex} (B2 position)`);
-                    console.log(`  Last pivot type updated to: ${lastPivotType}`);
-                } else {
-                    console.log(`  SPL pattern incomplete: B1=${splB1}, B2=${splB2}`);
-                }
-            } else if (!anchorFoundPattern) {
-                console.log(`  Skipping SPL pattern (alternation requires SPH next)`);
             }
             
-            // FIXED: If this anchor found a pattern, break out of for loop
-            if (anchorFoundPattern) {
-                break; // Exit for loop, continue with while loop
+            // If no pattern found yet, add current bar as new potential anchor
+            if (!patternFound && currentBarIdx < data.length - 2) {
+                potentialAnchors.push(currentBarIdx);
+                console.log(`    Added new potential anchor: Bar ${currentBarIdx}`);
             }
-            
-            // FIXED: Only move to next anchor after testing against ALL remaining bars
-            console.log(`  Bar ${anchorIdx} tested against all remaining bars - no valid pattern found, trying Bar ${anchorIdx + 1} as anchor`);
         }
         
-        // FIXED: Set currentSearchIndex based on what happened in the for loop
+        // If pattern found, record it and apply range optimization
         if (patternFound) {
-            currentSearchIndex = nextSearchIndex; // Jump to B2 of found pattern
+            confirmedPivots.push(pivotResult);
+            lastPivotType = pivotResult.type;
+            
+            // Stage 2: Range optimization - relocate previous pivot to true extreme
+            if (confirmedPivots.length >= 2) {
+                relocatePreviousPivot(confirmedPivots, data);
+            }
+            
+            currentSearchIndex = pivotResult.b2; // Start next search from B2
+            console.log(`  ✓ CONFIRMED: ${pivotResult.type.toUpperCase()} at Bar ${pivotResult.pivotIdx}`);
+            console.log(`  Next search starts from Bar ${currentSearchIndex}`);
         } else {
-            // FIXED: If no pattern found anywhere, we've reached the end
-            console.log(`No more alternating patterns can be found from Bar ${currentSearchIndex} onwards.`);
-            break; // Exit while loop completely
+            console.log(`  No more patterns found. Ending search.`);
+            break;
         }
     }
     
-    console.log(`\n=== CONFIRMED PIVOTS WITH ALTERNATION: ${confirmedPivots.length} patterns found ===`);
-    confirmedPivots.forEach((det, i) => {
-        console.log(`${i+1}. ${det.type.toUpperCase()} at Bar ${det.pivotIdx} (price=${det.price.toFixed(2)}) - Anchor=${det.anchor}, B1=${det.b1}, B2=${det.b2}`);
+    console.log(`\n=== PARALLEL TESTING RESULTS: ${confirmedPivots.length} pivots found ===`);
+    confirmedPivots.forEach((pivot, i) => {
+        console.log(`${i+1}. ${pivot.type.toUpperCase()} at Bar ${pivot.pivotIdx} (price=${pivot.price.toFixed(2)}) - A=${pivot.anchor}, B1=${pivot.b1}, B2=${pivot.b2}`);
     });
     
-    // Phase 2: Update to highest/lowest in ranges (dynamic small pivots)
-    console.log(`\n=== UPDATING TO EXTREMES IN RANGES ===`);
+    // Convert to final arrays
     const finalSPH = [];
     const finalSPL = [];
     
-    for (let i = 0; i < confirmedPivots.length; i++) {
-        const current = confirmedPivots[i];
-        
-        if (current.type === 'sph') {
-            // Find range between SPLs
-            let startIdx = 0;
-            let endIdx = data.length - 1;
-            
-            // Find previous SPL
-            for (let j = i - 1; j >= 0; j--) {
-                if (confirmedPivots[j].type === 'spl') {
-                    startIdx = confirmedPivots[j].pivotIdx;
-                    break;
-                }
-            }
-            
-            // Find next SPL
-            for (let j = i + 1; j < confirmedPivots.length; j++) {
-                if (confirmedPivots[j].type === 'spl') {
-                    endIdx = confirmedPivots[j].pivotIdx;
-                    break;
-                }
-            }
-            
-            // Find highest in range
-            let highestIdx = current.pivotIdx;
-            let highestPrice = data[current.pivotIdx].high;
-            
-            for (let k = startIdx; k <= endIdx; k++) {
-                if (data[k].high > highestPrice) {
-                    highestPrice = data[k].high;
-                    highestIdx = k;
-                }
-            }
-            
-            finalSPH.push(highestIdx);
-            console.log(`SPH range [${startIdx}-${endIdx}]: highest at Bar ${highestIdx} (${highestPrice.toFixed(2)})`);
+    confirmedPivots.forEach(pivot => {
+        if (pivot.type === 'sph') {
+            finalSPH.push(pivot.pivotIdx);
         } else {
-            // Find range between SPHs
-            let startIdx = 0;
-            let endIdx = data.length - 1;
-            
-            // Find previous SPH
-            for (let j = i - 1; j >= 0; j--) {
-                if (confirmedPivots[j].type === 'sph') {
-                    startIdx = confirmedPivots[j].pivotIdx;
-                    break;
-                }
-            }
-            
-            // Find next SPH
-            for (let j = i + 1; j < confirmedPivots.length; j++) {
-                if (confirmedPivots[j].type === 'sph') {
-                    endIdx = confirmedPivots[j].pivotIdx;
-                    break;
-                }
-            }
-            
-            // Find lowest in range
-            let lowestIdx = current.pivotIdx;
-            let lowestPrice = data[current.pivotIdx].low;
-            
-            for (let k = startIdx; k <= endIdx; k++) {
-                if (data[k].low < lowestPrice) {
-                    lowestPrice = data[k].low;
-                    lowestIdx = k;
-                }
-            }
-            
-            finalSPL.push(lowestIdx);
-            console.log(`SPL range [${startIdx}-${endIdx}]: lowest at Bar ${lowestIdx} (${lowestPrice.toFixed(2)})`);
+            finalSPL.push(pivot.pivotIdx);
         }
-    }
+    });
     
     // Phase 3: Large Pivot Detection
     console.log(`\n=== LARGE PIVOT DETECTION ===`);
@@ -282,7 +123,6 @@ if (!data || !Array.isArray(data) || data.length < 3) {
     const finalLPL = [];
     
     // Detect Large Pivot Highs (LPH)
-    // LPH triggered when SPL breaks below previous SPL
     for (let i = 1; i < finalSPL.length; i++) {
         const currentSPL = finalSPL[i];
         const prevSPL = finalSPL[i-1];
@@ -290,7 +130,6 @@ if (!data || !Array.isArray(data) || data.length < 3) {
         if (data[currentSPL].low < data[prevSPL].low) {
             console.log(`SPL Break: Bar ${currentSPL} (${data[currentSPL].low.toFixed(2)}) below Bar ${prevSPL} (${data[prevSPL].low.toFixed(2)})`);
             
-            // Find highest SPH between previous LPL and current SPL
             let searchStart = 0;
             if (finalLPL.length > 0) {
                 searchStart = finalLPL[finalLPL.length - 1];
@@ -317,7 +156,6 @@ if (!data || !Array.isArray(data) || data.length < 3) {
     }
     
     // Detect Large Pivot Lows (LPL)
-    // LPL triggered when SPH breaks above previous SPH
     for (let i = 1; i < finalSPH.length; i++) {
         const currentSPH = finalSPH[i];
         const prevSPH = finalSPH[i-1];
@@ -325,7 +163,6 @@ if (!data || !Array.isArray(data) || data.length < 3) {
         if (data[currentSPH].high > data[prevSPH].high) {
             console.log(`SPH Break: Bar ${currentSPH} (${data[currentSPH].high.toFixed(2)}) above Bar ${prevSPH} (${data[prevSPH].high.toFixed(2)})`);
             
-            // Find lowest SPL between previous LPH and current SPH
             let searchStart = 0;
             if (finalLPH.length > 0) {
                 searchStart = finalLPH[finalLPH.length - 1];
@@ -363,6 +200,203 @@ if (!data || !Array.isArray(data) || data.length < 3) {
         lph: finalLPH,
         lpl: finalLPL
     };
+}
+
+// Stage 2: Range optimization function
+function relocatePreviousPivot(confirmedPivots, data) {
+    if (confirmedPivots.length < 2) return;
+    
+    const currentPivot = confirmedPivots[confirmedPivots.length - 1];
+    const previousPivot = confirmedPivots[confirmedPivots.length - 2];
+    
+    console.log(`\n  === STAGE 2: RANGE OPTIMIZATION ===`);
+    console.log(`  Current pivot: ${currentPivot.type.toUpperCase()} at Bar ${currentPivot.pivotIdx}`);
+    console.log(`  Previous pivot: ${previousPivot.type.toUpperCase()} at Bar ${previousPivot.pivotIdx}`);
+    
+    if (currentPivot.type === 'spl' && previousPivot.type === 'sph') {
+        // Relocate previous SPH to highest between two SPLs
+        relocateSPH(confirmedPivots, data);
+    } else if (currentPivot.type === 'sph' && previousPivot.type === 'spl') {
+        // Relocate previous SPL to lowest between two SPHs
+        relocateSPL(confirmedPivots, data);
+    }
+}
+
+function relocateSPH(confirmedPivots, data) {
+    const currentSPL = confirmedPivots[confirmedPivots.length - 1]; // Just confirmed SPL
+    const previousSPH = confirmedPivots[confirmedPivots.length - 2]; // SPH to relocate
+    
+    // Find SPL before the previous SPH
+    let prevSPL = null;
+    for (let i = confirmedPivots.length - 3; i >= 0; i--) {
+        if (confirmedPivots[i].type === 'spl') {
+            prevSPL = confirmedPivots[i];
+            break;
+        }
+    }
+    
+    // Define range: from previous SPL to current SPL
+    const startIdx = prevSPL ? prevSPL.pivotIdx : 0;
+    const endIdx = currentSPL.pivotIdx;
+    
+    console.log(`  Relocating SPH in range [${startIdx}-${endIdx}]`);
+    
+    // Find actual highest in range
+    let highestIdx = startIdx;
+    let highestPrice = data[startIdx].high;
+    
+    for (let i = startIdx; i <= endIdx; i++) {
+        if (data[i].high > highestPrice) {
+            highestPrice = data[i].high;
+            highestIdx = i;
+        }
+    }
+    
+    if (highestIdx !== previousSPH.pivotIdx) {
+        console.log(`  ✓ SPH RELOCATED: Bar ${previousSPH.pivotIdx} → Bar ${highestIdx} (${previousSPH.price.toFixed(2)} → ${highestPrice.toFixed(2)})`);
+        previousSPH.pivotIdx = highestIdx;
+        previousSPH.price = highestPrice;
+    } else {
+        console.log(`  ✓ SPH already at optimal position: Bar ${highestIdx}`);
+    }
+}
+
+function relocateSPL(confirmedPivots, data) {
+    const currentSPH = confirmedPivots[confirmedPivots.length - 1]; // Just confirmed SPH
+    const previousSPL = confirmedPivots[confirmedPivots.length - 2]; // SPL to relocate
+    
+    // Find SPH before the previous SPL
+    let prevSPH = null;
+    for (let i = confirmedPivots.length - 3; i >= 0; i--) {
+        if (confirmedPivots[i].type === 'sph') {
+            prevSPH = confirmedPivots[i];
+            break;
+        }
+    }
+    
+    // Define range: from previous SPH to current SPH
+    const startIdx = prevSPH ? prevSPH.pivotIdx : 0;
+    const endIdx = currentSPH.pivotIdx;
+    
+    console.log(`  Relocating SPL in range [${startIdx}-${endIdx}]`);
+    
+    // Find actual lowest in range
+    let lowestIdx = startIdx;
+    let lowestPrice = data[startIdx].low;
+    
+    for (let i = startIdx; i <= endIdx; i++) {
+        if (data[i].low < lowestPrice) {
+            lowestPrice = data[i].low;
+            lowestIdx = i;
+        }
+    }
+    
+    if (lowestIdx !== previousSPL.pivotIdx) {
+        console.log(`  ✓ SPL RELOCATED: Bar ${previousSPL.pivotIdx} → Bar ${lowestIdx} (${previousSPL.price.toFixed(2)} → ${lowestPrice.toFixed(2)})`);
+        previousSPL.pivotIdx = lowestIdx;
+        previousSPL.price = lowestPrice;
+    } else {
+        console.log(`  ✓ SPL already at optimal position: Bar ${lowestIdx}`);
+    }
+}
+
+// Stage 1: Enhanced pattern testing with full range scanning
+function testSPHPattern(data, anchorIdx, currentBarIdx) {
+    const anchor = data[anchorIdx];
+    let b1 = -1, b2 = -1;
+    
+    // Find B1: first bar after anchor with lower low AND lower close
+    for (let i = anchorIdx + 1; i <= currentBarIdx; i++) {
+        const bar = data[i];
+        if (bar.low < anchor.low && bar.close < anchor.close) {
+            b1 = i;
+            break;
+        }
+    }
+    
+    // Find B2: first bar after B1 with lower low AND lower close than anchor
+    if (b1 !== -1) {
+        for (let i = b1 + 1; i <= currentBarIdx; i++) {
+            const bar = data[i];
+            if (bar.low < anchor.low && bar.close < anchor.close) {
+                b2 = i;
+                break;
+            }
+        }
+    }
+    
+    // If complete pattern found, find highest in ENTIRE range from anchor to B2
+    if (b1 !== -1 && b2 !== -1) {
+        let highestIdx = anchorIdx;
+        let highestPrice = anchor.high;
+        
+        // Scan entire range from anchor to B2
+        for (let i = anchorIdx; i <= b2; i++) {
+            if (data[i].high > highestPrice) {
+                highestPrice = data[i].high;
+                highestIdx = i;
+            }
+        }
+        
+        return {
+            complete: true,
+            b1: b1,
+            b2: b2,
+            pivotIdx: highestIdx,
+            price: highestPrice
+        };
+    }
+    
+    return { complete: false };
+}
+
+function testSPLPattern(data, anchorIdx, currentBarIdx) {
+    const anchor = data[anchorIdx];
+    let b1 = -1, b2 = -1;
+    
+    // Find B1: first bar after anchor with higher high AND higher close
+    for (let i = anchorIdx + 1; i <= currentBarIdx; i++) {
+        const bar = data[i];
+        if (bar.high > anchor.high && bar.close > anchor.close) {
+            b1 = i;
+            break;
+        }
+    }
+    
+    // Find B2: first bar after B1 with higher high AND higher close than anchor
+    if (b1 !== -1) {
+        for (let i = b1 + 1; i <= currentBarIdx; i++) {
+            const bar = data[i];
+            if (bar.high > anchor.high && bar.close > anchor.close) {
+                b2 = i;
+                break;
+            }
+        }
+    }
+    
+    // If complete pattern found, find lowest in ENTIRE range from anchor to B2
+    if (b1 !== -1 && b2 !== -1) {
+        let lowestIdx = anchorIdx;
+        let lowestPrice = anchor.low;
+        
+        // Scan entire range from anchor to B2
+        for (let i = anchorIdx; i <= b2; i++) {
+            if (data[i].low < lowestPrice) {
+                lowestPrice = data[i].low;
+                lowestIdx = i;
+            }
+        }
+        
+        return {
+            complete: true,
+            b1: b1,
+            b2: b2,
+            pivotIdx: lowestIdx,
+            price: lowestPrice
+        };
+    }
+    
+    return { complete: false };
 }
 
 // Export for use in other modules
