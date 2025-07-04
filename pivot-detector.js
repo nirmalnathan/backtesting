@@ -117,73 +117,129 @@ function detectPivots(data) {
         }
     });
     
-    // Phase 3: Large Pivot Detection
-    console.log(`\n=== LARGE PIVOT DETECTION ===`);
+    // Phase 3: NEW Large Pivot Detection with Your Rules (COMPLETELY REPLACED)
+    console.log(`\n=== NEW LARGE PIVOT DETECTION WITH BAR-BY-BAR PROCESSING ===`);
     const finalLPH = [];
     const finalLPL = [];
     
-    // Detect Large Pivot Highs (LPH)
-    for (let i = 1; i < finalSPL.length; i++) {
-        const currentSPL = finalSPL[i];
-        const prevSPL = finalSPL[i-1];
+    if (finalSPH.length === 0 || finalSPL.length === 0) {
+        console.log('Insufficient SPH/SPL for large pivot detection');
+    } else {
+        // Rule 1: Start with LPL detection
+        let expectingLPL = true;
+        let currentSPHRefIdx = 0; // Index in finalSPH array  
+        let currentSPLRefIdx = 0; // Index in finalSPL array
         
-        if (data[currentSPL].low < data[prevSPL].low) {
-            console.log(`SPL Break: Bar ${currentSPL} (${data[currentSPL].low.toFixed(2)}) below Bar ${prevSPL} (${data[prevSPL].low.toFixed(2)})`);
+        console.log(`\n🔄 Starting with LPL detection using first SPH as reference...`);
+        console.log(`Available SPH: [${finalSPH.join(', ')}]`);
+        console.log(`Available SPL: [${finalSPL.join(', ')}]`);
+        
+        // Bar-by-bar processing from start to end
+        for (let barIdx = 0; barIdx < data.length; barIdx++) {
             
-            let searchStart = 0;
-            if (finalLPL.length > 0) {
-                searchStart = finalLPL[finalLPL.length - 1];
-            }
-            
-            let lphCandidate = -1;
-            let lphPrice = -1;
-            
-            for (let j = 0; j < finalSPH.length; j++) {
-                const sphIdx = finalSPH[j];
-                if (sphIdx > searchStart && sphIdx < currentSPL) {
-                    if (lphCandidate === -1 || data[sphIdx].high > lphPrice) {
-                        lphCandidate = sphIdx;
-                        lphPrice = data[sphIdx].high;
+            if (expectingLPL) {
+                // Rule 3: LPL Detection Logic
+                if (currentSPHRefIdx >= finalSPH.length) {
+                    console.log(`No more SPH references available for LPL detection`);
+                    break;
+                }
+                
+                const refSPHBarIdx = finalSPH[currentSPHRefIdx];
+                const refSPHHigh = data[refSPHBarIdx].high;
+                
+                // Only check bars that come after the reference SPH
+                if (barIdx > refSPHBarIdx) {
+                    const currentHigh = data[barIdx].high;
+                    
+                    // Check if current bar breaks the SPH high
+                    if (currentHigh > refSPHHigh) {
+                        console.log(`🔴 Bar ${barIdx} (high=${currentHigh.toFixed(2)}) BREAKS SPH${currentSPHRefIdx} at Bar ${refSPHBarIdx} (high=${refSPHHigh.toFixed(2)})`);
+                        
+                        // Find the latest SPL that occurs just before this breaking bar
+                        let latestSPLBarIdx = -1;
+                        
+                        for (let splIdx = 0; splIdx < finalSPL.length; splIdx++) {
+                            const splBarIdx = finalSPL[splIdx];
+                            if (splBarIdx < barIdx && splBarIdx > latestSPLBarIdx) {
+                                latestSPLBarIdx = splBarIdx;
+                            }
+                        }
+                        
+                        // Mark the latest SPL as LPL if found and not already marked
+                        if (latestSPLBarIdx !== -1 && !finalLPL.includes(latestSPLBarIdx)) {
+                            finalLPL.push(latestSPLBarIdx);
+                            console.log(`✅ LPL MARKED at Bar ${latestSPLBarIdx} (low=${data[latestSPLBarIdx].low.toFixed(2)}) - latest SPL before break`);
+                            
+                            // Rule 2: Switch to LPH detection
+                            expectingLPL = false;
+                            console.log(`🔄 Now expecting LPH detection...`);
+                        }
+                        
+                        // Move to next SPH reference for future LPL detections
+                        currentSPHRefIdx++;
                     }
                 }
-            }
-            
-            if (lphCandidate !== -1 && !finalLPH.includes(lphCandidate)) {
-                finalLPH.push(lphCandidate);
-                console.log(`LPH marked at Bar ${lphCandidate} (${lphPrice.toFixed(2)})`);
-            }
-        }
-    }
-    
-    // Detect Large Pivot Lows (LPL)
-    for (let i = 1; i < finalSPH.length; i++) {
-        const currentSPH = finalSPH[i];
-        const prevSPH = finalSPH[i-1];
-        
-        if (data[currentSPH].high > data[prevSPH].high) {
-            console.log(`SPH Break: Bar ${currentSPH} (${data[currentSPH].high.toFixed(2)}) above Bar ${prevSPH} (${data[prevSPH].high.toFixed(2)})`);
-            
-            let searchStart = 0;
-            if (finalLPH.length > 0) {
-                searchStart = finalLPH[finalLPH.length - 1];
-            }
-            
-            let lplCandidate = -1;
-            let lplPrice = Infinity;
-            
-            for (let j = 0; j < finalSPL.length; j++) {
-                const splIdx = finalSPL[j];
-                if (splIdx > searchStart && splIdx < currentSPH) {
-                    if (lplCandidate === -1 || data[splIdx].low < lplPrice) {
-                        lplCandidate = splIdx;
-                        lplPrice = data[splIdx].low;
+                
+                // Rule 4: If we reach the next SPH without any breaks, switch SPH reference
+                if (currentSPHRefIdx < finalSPH.length - 1) {
+                    const nextSPHBarIdx = finalSPH[currentSPHRefIdx + 1];
+                    if (barIdx >= nextSPHBarIdx) {
+                        console.log(`📍 Reached next SPH at Bar ${nextSPHBarIdx} without breaks - switching reference`);
+                        currentSPHRefIdx++;
                     }
                 }
-            }
-            
-            if (lplCandidate !== -1 && !finalLPL.includes(lplCandidate)) {
-                finalLPL.push(lplCandidate);
-                console.log(`LPL marked at Bar ${lplCandidate} (${lplPrice.toFixed(2)})`);
+                
+            } else {
+                // Rule 4: LPH Detection Logic (vice versa)
+                if (currentSPLRefIdx >= finalSPL.length) {
+                    console.log(`No more SPL references available for LPH detection`);
+                    break;
+                }
+                
+                const refSPLBarIdx = finalSPL[currentSPLRefIdx];
+                const refSPLLow = data[refSPLBarIdx].low;
+                
+                // Only check bars that come after the reference SPL
+                if (barIdx > refSPLBarIdx) {
+                    const currentLow = data[barIdx].low;
+                    
+                    // Check if current bar breaks the SPL low
+                    if (currentLow < refSPLLow) {
+                        console.log(`🔵 Bar ${barIdx} (low=${currentLow.toFixed(2)}) BREAKS SPL${currentSPLRefIdx} at Bar ${refSPLBarIdx} (low=${refSPLLow.toFixed(2)})`);
+                        
+                        // Find the latest SPH that occurs just before this breaking bar
+                        let latestSPHBarIdx = -1;
+                        
+                        for (let sphIdx = 0; sphIdx < finalSPH.length; sphIdx++) {
+                            const sphBarIdx = finalSPH[sphIdx];
+                            if (sphBarIdx < barIdx && sphBarIdx > latestSPHBarIdx) {
+                                latestSPHBarIdx = sphBarIdx;
+                            }
+                        }
+                        
+                        // Mark the latest SPH as LPH if found and not already marked
+                        if (latestSPHBarIdx !== -1 && !finalLPH.includes(latestSPHBarIdx)) {
+                            finalLPH.push(latestSPHBarIdx);
+                            console.log(`✅ LPH MARKED at Bar ${latestSPHBarIdx} (high=${data[latestSPHBarIdx].high.toFixed(2)}) - latest SPH before break`);
+                            
+                            // Rule 2: Switch to LPL detection
+                            expectingLPL = true;
+                            console.log(`🔄 Now expecting LPL detection...`);
+                        }
+                        
+                        // Move to next SPL reference for future LPH detections
+                        currentSPLRefIdx++;
+                    }
+                }
+                
+                // Rule 4: If we reach the next SPL without any breaks, switch SPL reference
+                if (currentSPLRefIdx < finalSPL.length - 1) {
+                    const nextSPLBarIdx = finalSPL[currentSPLRefIdx + 1];
+                    if (barIdx >= nextSPLBarIdx) {
+                        console.log(`📍 Reached next SPL at Bar ${nextSPLBarIdx} without breaks - switching reference`);
+                        currentSPLRefIdx++;
+                    }
+                }
             }
         }
     }
@@ -202,7 +258,7 @@ function detectPivots(data) {
     };
 }
 
-// Stage 2: Range optimization function
+// Stage 2: Range optimization function (UNCHANGED)
 function relocatePreviousPivot(confirmedPivots, data) {
     if (confirmedPivots.length < 2) return;
     
@@ -300,7 +356,7 @@ function relocateSPL(confirmedPivots, data) {
     }
 }
 
-// Stage 1: Enhanced pattern testing with full range scanning
+// Stage 1: Enhanced pattern testing with full range scanning (UNCHANGED)
 function testSPHPattern(data, anchorIdx, currentBarIdx) {
     const anchor = data[anchorIdx];
     let b1 = -1, b2 = -1;

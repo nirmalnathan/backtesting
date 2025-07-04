@@ -1,5 +1,5 @@
-// chart-renderer.js
-// Fixed chart renderer with proper event handling
+// chart-renderer.js - DEBUG VERSION with Crosshair and Arrow Navigation
+// Fixed chart renderer with debug logging, crosshair tooltip, and keyboard navigation
 
 let canvasWidth = 1200;
 let canvasHeight = 700;
@@ -8,6 +8,9 @@ let panY = 0;
 let isDragging = false;
 let lastMouseX = 0;
 let lastMouseY = 0;
+let mouseX = 0;
+let mouseY = 0;
+let showCrosshair = false;
 
 // Expose pan variables globally for tooltip calculations
 window.panX = panX;
@@ -21,8 +24,22 @@ function updateGlobalPanVars() {
     window.isDragging = isDragging;
 }
 
-// Draw chart
+// Draw chart with comprehensive debugging
 function drawChart(data, pivots) {
+    console.log('=== CHART RENDERER DEBUG ===');
+    console.log('Data length:', data ? data.length : 'undefined');
+    console.log('Pivots object:', pivots);
+    
+    if (pivots) {
+        console.log('SPH array:', pivots.sph, 'Length:', pivots.sph ? pivots.sph.length : 'undefined');
+        console.log('SPL array:', pivots.spl, 'Length:', pivots.spl ? pivots.spl.length : 'undefined');
+        console.log('LPH array:', pivots.lph, 'Length:', pivots.lph ? pivots.lph.length : 'undefined');
+        console.log('LPL array:', pivots.lpl, 'Length:', pivots.lpl ? pivots.lpl.length : 'undefined');
+    } else {
+        console.log('❌ PIVOTS IS NULL/UNDEFINED');
+        return;
+    }
+    
     const canvas = document.getElementById('chart');
     const container = document.getElementById('chartContainer');
     
@@ -130,43 +147,168 @@ function drawChart(data, pivots) {
         ctx.fillRect(x + 1, bodyTop, Math.max(1, barWidth - 2), Math.max(1, bodyHeight));
     }
     
-    // Draw pivots
-    function drawPivot(pivotIndices, color, label, isHigh) {
+    // Enhanced pivot drawing function with debug logs and offset positioning
+    function drawPivot(pivotIndices, color, label, isHigh, isLargePivot = false) {
+        console.log(`\n--- Drawing ${label} pivots ---`);
+        console.log(`Color: ${color}, IsHigh: ${isHigh}, IsLarge: ${isLargePivot}`);
+        console.log(`Pivot indices:`, pivotIndices);
+        
+        if (!pivotIndices || !Array.isArray(pivotIndices)) {
+            console.log(`❌ ${label} indices is not a valid array:`, pivotIndices);
+            return;
+        }
+        
+        if (pivotIndices.length === 0) {
+            console.log(`⚠️ ${label} array is empty`);
+            return;
+        }
+        
         ctx.fillStyle = color;
         ctx.strokeStyle = color;
         ctx.font = '12px Arial';
         ctx.textAlign = 'center';
         
-        pivotIndices.forEach(index => {
-            if (index < data.length) {
-                const bar = data[index];
-                const x = margin.left + (index * barWidth) + barWidth / 2;
-                const price = isHigh ? bar.high : bar.low;
-                const y = margin.top + ((adjustedMaxPrice - price) / priceRange) * chartHeight;
-                
-                // Draw marker
-                ctx.beginPath();
-                ctx.arc(x, y, 4, 0, 2 * Math.PI);
-                ctx.fill();
-                
-                // Draw label
-                const labelY = isHigh ? y - 15 : y + 25;
-                ctx.fillText(label, x, labelY);
-                
-                // Draw index number
-                ctx.font = '10px Arial';
-                ctx.fillText(index.toString(), x, isHigh ? y - 25 : y + 35);
-                ctx.font = '12px Arial';
+        let renderedCount = 0;
+        
+        pivotIndices.forEach((index, arrayIndex) => {
+            console.log(`Processing ${label}[${arrayIndex}] = ${index}`);
+            
+            if (index < 0 || index >= data.length) {
+                console.log(`❌ ${label} index ${index} is out of bounds (data length: ${data.length})`);
+                return;
             }
+            
+            const bar = data[index];
+            if (!bar) {
+                console.log(`❌ No bar data found at index ${index}`);
+                return;
+            }
+            
+            const x = margin.left + (index * barWidth) + barWidth / 2;
+            const price = isHigh ? bar.high : bar.low;
+            let y = margin.top + ((adjustedMaxPrice - price) / priceRange) * chartHeight;
+            
+            // Apply offset for large pivots to avoid overlap
+            if (isLargePivot) {
+                if (isHigh) {
+                    y -= 40; // Move LPH higher (above SPH)
+                } else {
+                    y += 40; // Move LPL lower (below SPL)
+                }
+            }
+            
+            console.log(`${label}[${index}] at (${x.toFixed(1)}, ${y.toFixed(1)}) price=${price.toFixed(2)} offset=${isLargePivot ? (isHigh ? '-20' : '+20') : '0'}`);
+            
+            // Draw marker with larger size for visibility
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Draw label with adjusted positioning
+            const labelY = isHigh ? y - 15 : y + 25;
+            ctx.fillText(label, x, labelY);
+            
+            // Draw index number with adjusted positioning
+            ctx.font = '10px Arial';
+            ctx.fillText(index.toString(), x, isHigh ? y - 25 : y + 35);
+            ctx.font = '12px Arial';
+            
+            renderedCount++;
         });
+        
+        console.log(`✅ Successfully rendered ${renderedCount} ${label} pivots`);
     }
     
-    drawPivot(pivots.sph, '#ff6b6b', 'SPH', true);
-    drawPivot(pivots.spl, '#4ecdc4', 'SPL', false);
-    drawPivot(pivots.lph, '#ff4757', 'LPH', true);
-    drawPivot(pivots.lpl, '#2ed573', 'LPL', false);
+    // Draw all pivot types with debug info and proper spacing
+    console.log('\n🔵 Starting pivot rendering...');
+    
+    drawPivot(pivots.sph || [], '#ff6b6b', 'SPH', true, false);   // Small pivot high - normal position
+    drawPivot(pivots.spl || [], '#4ecdc4', 'SPL', false, false); // Small pivot low - normal position
+    drawPivot(pivots.lph || [], '#0000ff', 'LPH', true, true);   // Large pivot high - offset higher
+    drawPivot(pivots.lpl || [], '#ff00ff', 'LPL', false, true);  // Large pivot low - offset lower
+    
+    console.log('🔵 Finished pivot rendering');
+    
+    // Draw crosshair if mouse is over chart
+    if (showCrosshair) {
+        drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxPrice, priceRange, chartHeight);
+    }
+    
+    console.log('=== END CHART RENDERER DEBUG ===\n');
     
     ctx.restore();
+}
+
+// Draw crosshair with X and Y axis values
+function drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxPrice, priceRange, chartHeight) {
+    const canvas = document.getElementById('chart');
+    
+    // Calculate chart bounds
+    const chartLeft = margin.left;
+    const chartRight = canvas.width - margin.right;
+    const chartTop = margin.top;
+    const chartBottom = margin.top + chartHeight;
+    
+    // Only draw if mouse is within chart area
+    if (mouseX < chartLeft || mouseX > chartRight || mouseY < chartTop || mouseY > chartBottom) {
+        return;
+    }
+    
+    ctx.save();
+    
+    // Draw crosshair lines
+    ctx.strokeStyle = '#ff0000';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    
+    // Vertical line
+    ctx.beginPath();
+    ctx.moveTo(mouseX, chartTop);
+    ctx.lineTo(mouseX, chartBottom);
+    ctx.stroke();
+    
+    // Horizontal line
+    ctx.beginPath();
+    ctx.moveTo(chartLeft, mouseY);
+    ctx.lineTo(chartRight, mouseY);
+    ctx.stroke();
+    
+    // Calculate values
+    const barIndex = Math.floor((mouseX - margin.left) / barWidth);
+    const price = adjustedMaxPrice - ((mouseY - margin.top) / chartHeight) * priceRange;
+    
+    // Draw value boxes
+    ctx.setLineDash([]);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.font = '12px Arial';
+    
+    // Y-axis price label
+    const priceText = price.toFixed(2);
+    const priceWidth = ctx.measureText(priceText).width + 10;
+    ctx.fillRect(chartLeft - priceWidth - 5, mouseY - 10, priceWidth, 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'right';
+    ctx.fillText(priceText, chartLeft - 5, mouseY + 4);
+    
+    // X-axis bar/time label
+    let timeText = '';
+    if (barIndex >= 0 && barIndex < data.length) {
+        const bar = data[barIndex];
+        const date = new Date(bar.timestamp);
+        timeText = `Bar ${barIndex} - ${date.toLocaleDateString()}`;
+    } else {
+        timeText = `Bar ${barIndex}`;
+    }
+    
+    const timeWidth = ctx.measureText(timeText).width + 10;
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.fillRect(mouseX - timeWidth/2, chartBottom + 5, timeWidth, 20);
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(timeText, mouseX, chartBottom + 18);
+    
+    ctx.restore();
+}
 }
 
 // Setup event listeners for chart interaction
@@ -190,7 +332,7 @@ function setupChartEventListeners() {
         }
     });
     
-    // Mouse events for panning
+    // Mouse events for panning and crosshair
     canvas.addEventListener('mousedown', function(e) {
         isDragging = true;
         lastMouseX = e.clientX;
@@ -200,6 +342,11 @@ function setupChartEventListeners() {
     });
     
     canvas.addEventListener('mousemove', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = e.clientX - rect.left - panX;
+        mouseY = e.clientY - rect.top - panY;
+        showCrosshair = true;
+        
         if (isDragging) {
             const deltaX = e.clientX - lastMouseX;
             const deltaY = e.clientY - lastMouseY;
@@ -211,10 +358,10 @@ function setupChartEventListeners() {
             lastMouseY = e.clientY;
             
             updateGlobalPanVars();
-            
-            if (window.chartData && window.chartData.length > 0) {
-                drawChart(window.chartData, window.pivotData);
-            }
+        }
+        
+        if (window.chartData && window.chartData.length > 0) {
+            drawChart(window.chartData, window.pivotData);
         }
     });
     
@@ -226,11 +373,52 @@ function setupChartEventListeners() {
     
     canvas.addEventListener('mouseleave', function() {
         isDragging = false;
+        showCrosshair = false;
         canvas.style.cursor = 'grab';
         updateGlobalPanVars();
+        
+        if (window.chartData && window.chartData.length > 0) {
+            drawChart(window.chartData, window.pivotData);
+        }
     });
     
-    // FIXED: Wheel event with proper passive handling
+    canvas.addEventListener('mouseenter', function() {
+        showCrosshair = true;
+    });
+    
+    // Keyboard navigation for left/right arrows
+    document.addEventListener('keydown', function(e) {
+        if (!window.chartData || window.chartData.length === 0) return;
+        
+        const panSpeed = 50; // Pixels to pan per arrow press
+        let needsRedraw = false;
+        
+        switch(e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                panX += panSpeed; // Move chart right (shows earlier data)
+                needsRedraw = true;
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                panX -= panSpeed; // Move chart left (shows later data)
+                needsRedraw = true;
+                break;
+        }
+        
+        if (needsRedraw) {
+            updateGlobalPanVars();
+            drawChart(window.chartData, window.pivotData);
+        }
+    });
+    
+    // Make canvas focusable for keyboard events
+    canvas.setAttribute('tabindex', '0');
+    canvas.addEventListener('click', function() {
+        canvas.focus(); // Ensure canvas has focus for keyboard events
+    });
+    
+    // Wheel event with proper passive handling
     canvas.addEventListener('wheel', function(e) {
         e.preventDefault();
         
@@ -253,7 +441,7 @@ function setupChartEventListeners() {
         if (window.chartData && window.chartData.length > 0) {
             drawChart(window.chartData, window.pivotData);
         }
-    }, { passive: false }); // Explicitly mark as non-passive since we need preventDefault
+    }, { passive: false });
 }
 
 // Reset zoom and pan
@@ -284,7 +472,3 @@ function fitToScreenInternal() {
     
     resetZoomInternal();
 }
-
-// Expose functions globally
-window.resetZoomFunction = resetZoomInternal;
-window.fitToScreenFunction = fitToScreenInternal;
