@@ -291,9 +291,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Handle window resize
     window.addEventListener('resize', function() {
         setTimeout(() => {
-            if (window.fitToScreenFunction) {
-                window.fitToScreenFunction();
-            }
+            // if (window.fitToScreenFunction) {
+            //     window.fitToScreenFunction();
+            // }
         }, 100);
     });
     
