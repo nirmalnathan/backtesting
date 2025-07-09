@@ -191,9 +191,9 @@ function drawChart(data, pivots) {
             // Apply offset for large pivots to avoid overlap
             if (isLargePivot) {
                 if (isHigh) {
-                    y -= 40; // Move LPH higher (above SPH)
+                    y -= 20; // Move LPH higher (above SPH)
                 } else {
-                    y += 40; // Move LPL lower (below SPL)
+                    y += 20; // Move LPL lower (below SPL)
                 }
             }
             
@@ -309,7 +309,7 @@ function drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxP
     
     ctx.restore();
 }
-}
+
 
 // Setup event listeners for chart interaction
 function setupChartEventListeners() {
