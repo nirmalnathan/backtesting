@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIFTY Pivot Point Detector</title>
+    <title>NIFTY Pivot Point Detector with Simple Backtest</title>
     <style>
         * {
             margin: 0;
@@ -210,7 +210,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>NIFTY Pivot Point Detector</h1>
+        <h1>NIFTY Pivot Point Detector with Simple Backtest</h1>
         
         <div class="controls">
             <div class="file-input">
@@ -275,6 +275,8 @@
             </div>
         </div>
 
+        <!-- Simple Backtest Section will be inserted here by JavaScript -->
+
         <div class="chart-container" id="chartContainer">
             <canvas id="chart"></canvas>
             <div class="zoom-controls">
@@ -292,7 +294,7 @@
         </div>
     </div>
 
-    <!-- Include separate JavaScript files -->
+    <!-- Include all JavaScript files -->
     <script>
         // FIXED: Define global functions here to avoid loading issues with better debugging
         function resetZoom() {
@@ -348,9 +350,37 @@
             }
         }
     </script>
+    
+    <!-- Original scripts -->
     <script src="data-processor.js"></script>
     <script src="pivot-detector.js"></script>
     <script src="chart-renderer.js"></script>
     <script src="main-controller.js"></script>
+    
+    <!-- New backtest scripts -->
+    <script src="simple-backtest-engine.js"></script>
+    <script src="simple-results.js"></script>
+    <script src="simple-rule-ui.js"></script>
+    
+    <!-- Debug script to verify loading -->
+    <script>
+        // Debug: Check if functions are loaded
+        setTimeout(function() {
+            console.log('=== SCRIPT LOADING CHECK ===');
+            console.log('runSimpleBacktest available:', typeof window.runSimpleBacktest);
+            console.log('displaySimpleResults available:', typeof window.displaySimpleResults);
+            console.log('initializeSimpleBacktestUI available:', typeof window.initializeSimpleBacktestUI);
+            
+            if (typeof window.runSimpleBacktest !== 'function') {
+                console.error('❌ runSimpleBacktest not loaded! Check simple-backtest-engine.js');
+            }
+            if (typeof window.displaySimpleResults !== 'function') {
+                console.error('❌ displaySimpleResults not loaded! Check simple-results.js');
+            }
+            if (typeof window.initializeSimpleBacktestUI !== 'function') {
+                console.error('❌ initializeSimpleBacktestUI not loaded! Check simple-rule-ui.js');
+            }
+        }, 1000);
+    </script>
 </body>
 </html>

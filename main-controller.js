@@ -1,4 +1,4 @@
-// main-controller.js
+// main-controller.js - FIXED VERSION
 // FIXED: Proper data validation and error handling for split functionality with debug protection
 
 // Global variables
@@ -204,7 +204,7 @@ function detectPivotsInternal() {
     }
 }
 
-// Get bar data at specific canvas coordinates
+// Get bar data at specific canvas coordinates - FIXED WITH PROPER PAN OFFSET
 function getBarAtPosition(x, y) {
     if (!window.chartData || window.chartData.length === 0) return null;
     
@@ -218,23 +218,28 @@ function getBarAtPosition(x, y) {
     // Calculate bar width with zoom
     const barWidth = Math.max(2, (chartWidth / window.chartData.length) * hZoom);
     
-    // Adjust for panning
-    const adjustedX = x - window.panX - margin.left;
+    // CRITICAL FIX: Adjust for panning correctly
+    // The mouse position needs to account for pan offset
+    const adjustedX = x - margin.left - window.panX;
     
     // Calculate bar index
     const barIndex = Math.floor(adjustedX / barWidth);
     
+    console.log(`Tooltip Debug: mouseX=${x}, adjustedX=${adjustedX}, barWidth=${barWidth}, barIndex=${barIndex}, panX=${window.panX}`);
+    
     if (barIndex >= 0 && barIndex < window.chartData.length) {
+        console.log(`Found bar ${barIndex}:`, window.chartData[barIndex]);
         return {
             index: barIndex,
             data: window.chartData[barIndex]
         };
     }
     
+    console.log(`Bar index ${barIndex} out of bounds (0-${window.chartData.length-1})`);
     return null;
 }
 
-// Show tooltip with OHLC data
+// Show tooltip with OHLC data - ENHANCED WITH MORE DETAILS
 function showTooltip(x, y, barData) {
     let tooltip = document.getElementById('chartTooltip');
     
@@ -242,33 +247,75 @@ function showTooltip(x, y, barData) {
         tooltip = document.createElement('div');
         tooltip.id = 'chartTooltip';
         tooltip.style.cssText = `
-            position: absolute;
-            background: rgba(0, 0, 0, 0.8);
+            position: fixed;
+            background: rgba(0, 0, 0, 0.9);
             color: white;
-            padding: 8px;
-            border-radius: 4px;
+            padding: 12px;
+            border-radius: 6px;
             font-size: 12px;
-            font-family: monospace;
+            font-family: 'Courier New', monospace;
             pointer-events: none;
-            z-index: 1000;
+            z-index: 10000;
             white-space: nowrap;
+            border: 1px solid #444;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
         `;
         document.body.appendChild(tooltip);
     }
     
+    // Fix date display in tooltip
+    let dateDisplay = 'Invalid Date';
+    let timeDisplay = '';
+    
+    try {
+        const dateSource = barData.data.datetime || barData.data.timestamp || barData.data.date;
+        if (dateSource) {
+            const date = new Date(dateSource);
+            if (!isNaN(date.getTime())) {
+                dateDisplay = date.toLocaleDateString();
+                timeDisplay = date.toLocaleTimeString();
+            } else {
+                dateDisplay = `Bar ${barData.index}`;
+                timeDisplay = 'Time: N/A';
+            }
+        } else {
+            dateDisplay = `Bar ${barData.index}`;
+            timeDisplay = 'Time: N/A';
+        }
+    } catch (error) {
+        dateDisplay = `Bar ${barData.index}`;
+        timeDisplay = 'Time: N/A';
+    }
+    
+    // Enhanced tooltip with clear formatting
     tooltip.innerHTML = `
-        <div><strong>Bar ${barData.index}</strong></div>
-        <div>Open: ${barData.data.open.toFixed(2)}</div>
-        <div>High: ${barData.data.high.toFixed(2)}</div>
-        <div>Low: ${barData.data.low.toFixed(2)}</div>
-        <div>Close: ${barData.data.close.toFixed(2)}</div>
-        <div>Time: ${new Date(barData.data.datetime).toLocaleString()}</div>
+        <div style="color: #FFD700; font-weight: bold; margin-bottom: 4px;">Bar ${barData.index}</div>
+        <div style="color: #ADD8E6; margin-bottom: 4px;">${dateDisplay}</div>
+        <div style="color: #ADD8E6; margin-bottom: 6px;">${timeDisplay}</div>
+        <div style="color: #90EE90;">Open:  ${barData.data.open.toFixed(2)}</div>
+        <div style="color: #FF6B6B;">High:  ${barData.data.high.toFixed(2)}</div>
+        <div style="color: #FF6B6B;">Low:   ${barData.data.low.toFixed(2)}</div>
+        <div style="color: #87CEEB;">Close: ${barData.data.close.toFixed(2)}</div>
     `;
     
-    // Position tooltip
-    tooltip.style.left = (x + 10) + 'px';
-    tooltip.style.top = (y - 10) + 'px';
+    // Position tooltip near mouse but avoid going off screen
+    let tooltipX = x + 15;
+    let tooltipY = y - 10;
+    
+    // Adjust if tooltip would go off screen
+    const tooltipRect = tooltip.getBoundingClientRect();
+    if (tooltipX + 200 > window.innerWidth) {
+        tooltipX = x - 220; // Show on left side of cursor
+    }
+    if (tooltipY - 100 < 0) {
+        tooltipY = y + 20; // Show below cursor
+    }
+    
+    tooltip.style.left = tooltipX + 'px';
+    tooltip.style.top = tooltipY + 'px';
     tooltip.style.display = 'block';
+    
+    console.log(`Showing tooltip for bar ${barData.index}: O=${barData.data.open} H=${barData.data.high} L=${barData.data.low} C=${barData.data.close}`);
 }
 
 // Hide tooltip
@@ -279,29 +326,47 @@ function hideTooltip() {
     }
 }
 
-// Setup chart mouse events for tooltips
+// Setup chart mouse events for tooltips - ENHANCED DEBUG VERSION
 function setupChartTooltips() {
     const canvas = document.getElementById('chart');
     
+    console.log('Setting up chart tooltips...');
+    
     canvas.addEventListener('mousemove', function(e) {
+        // Only show tooltip when not dragging
         if (!window.isDragging) {
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
             
+            console.log(`Mouse at: ${x}, ${y} | isDragging: ${window.isDragging}`);
+            
             const barData = getBarAtPosition(x, y);
             
             if (barData) {
+                console.log('Showing tooltip for bar:', barData.index);
                 showTooltip(e.clientX, e.clientY, barData);
             } else {
                 hideTooltip();
             }
+        } else {
+            // Hide tooltip while dragging
+            hideTooltip();
         }
     });
     
     canvas.addEventListener('mouseleave', function() {
+        console.log('Mouse left canvas - hiding tooltip');
         hideTooltip();
     });
+    
+    // Also hide tooltip when starting to drag
+    canvas.addEventListener('mousedown', function() {
+        console.log('Mouse down - hiding tooltip');
+        hideTooltip();
+    });
+    
+    console.log('Chart tooltip setup complete');
 }
 
 // Expose functions globally

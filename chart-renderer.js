@@ -1,4 +1,4 @@
-// chart-renderer.js - DEBUG VERSION with Crosshair and Arrow Navigation
+// chart-renderer.js - FIXED VERSION with Date Display and Crosshair Tooltip
 // Fixed chart renderer with debug logging, crosshair tooltip, and keyboard navigation
 
 let canvasWidth = 1200;
@@ -101,7 +101,7 @@ function drawChart(data, pivots) {
         ctx.fillText(price.toFixed(1), margin.left - 5, y + 4);
     }
     
-    // Draw time grid and labels
+    // Draw time grid and labels - FIXED DATE PARSING
     const timeSteps = Math.max(1, Math.floor(data.length / 10));
     for (let i = 0; i < data.length; i += timeSteps) {
         const x = margin.left + (i * barWidth);
@@ -112,12 +112,31 @@ function drawChart(data, pivots) {
         ctx.lineTo(x, margin.top + chartHeight);
         ctx.stroke();
         
-        // Time labels
+        // Time labels - FIXED date parsing
         ctx.fillStyle = '#666';
         ctx.font = '11px Arial';
         ctx.textAlign = 'center';
-        const date = new Date(data[i].timestamp);
-        ctx.fillText(date.toLocaleDateString(), x, margin.top + chartHeight + 20);
+        
+        let dateLabel = 'Invalid Date';
+        try {
+            // Try different date property names from the data
+            let dateSource = data[i].datetime || data[i].timestamp || data[i].date;
+            if (dateSource) {
+                const date = new Date(dateSource);
+                if (!isNaN(date.getTime())) {
+                    dateLabel = date.toLocaleDateString();
+                } else {
+                    dateLabel = `Bar ${i}`;
+                }
+            } else {
+                dateLabel = `Bar ${i}`;
+            }
+        } catch (error) {
+            console.warn('Date parsing error for bar', i, ':', error);
+            dateLabel = `Bar ${i}`;
+        }
+        
+        ctx.fillText(dateLabel, x, margin.top + chartHeight + 20);
     }
     
     // Draw candlesticks
@@ -239,7 +258,7 @@ function drawChart(data, pivots) {
     ctx.restore();
 }
 
-// Draw crosshair with X and Y axis values
+// Draw crosshair with X and Y axis values - FIXED DATE PARSING
 function drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxPrice, priceRange, chartHeight) {
     const canvas = document.getElementById('chart');
     
@@ -290,12 +309,25 @@ function drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxP
     ctx.textAlign = 'right';
     ctx.fillText(priceText, chartLeft - 5, mouseY + 4);
     
-    // X-axis bar/time label
+    // X-axis bar/time label - FIXED DATE PARSING
     let timeText = '';
     if (barIndex >= 0 && barIndex < data.length) {
         const bar = data[barIndex];
-        const date = new Date(bar.timestamp);
-        timeText = `Bar ${barIndex} - ${date.toLocaleDateString()}`;
+        let dateSource = bar.datetime || bar.timestamp || bar.date;
+        let dateStr = 'Invalid Date';
+        
+        try {
+            if (dateSource) {
+                const date = new Date(dateSource);
+                if (!isNaN(date.getTime())) {
+                    dateStr = date.toLocaleDateString();
+                }
+            }
+        } catch (error) {
+            dateStr = 'Invalid Date';
+        }
+        
+        timeText = `Bar ${barIndex} - ${dateStr}`;
     } else {
         timeText = `Bar ${barIndex}`;
     }
@@ -309,7 +341,6 @@ function drawCrosshair(ctx, mouseX, mouseY, data, margin, barWidth, adjustedMaxP
     
     ctx.restore();
 }
-
 
 // Setup event listeners for chart interaction
 function setupChartEventListeners() {
@@ -472,3 +503,7 @@ function fitToScreenInternal() {
     
     resetZoomInternal();
 }
+
+// Export functions globally
+window.resetZoomFunction = resetZoomInternal;
+window.fitToScreenFunction = fitToScreenInternal;
