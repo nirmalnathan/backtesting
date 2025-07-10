@@ -186,25 +186,54 @@ function addSimpleBacktestStyles() {
     document.head.appendChild(style);
 }
 
-// Add UI elements to the page
+// Add UI elements to the page - ENHANCED ERROR HANDLING
 function addSimpleBacktestUI() {
+    // Check if UI already exists
+    const existingSection = document.querySelector('.simple-backtest-section');
+    if (existingSection) {
+        console.log('Simple backtest UI already exists, skipping creation');
+        return;
+    }
+    
     // Find a good place to insert the UI (after the existing controls)
     const controlsDiv = document.querySelector('.controls');
     if (!controlsDiv) {
-        console.error('Could not find controls div to insert backtest UI');
+        console.error('Could not find .controls div to insert backtest UI');
+        
+        // Fallback: try to find any container
+        const container = document.querySelector('.container') || document.body;
+        console.log('Using fallback container:', container.className || 'body');
+        
+        // Create the simple backtest section
+        const backtestSection = document.createElement('div');
+        backtestSection.className = 'simple-backtest-section';
+        backtestSection.innerHTML = getBacktestUIHTML();
+        
+        container.appendChild(backtestSection);
+        console.log('Backtest UI added to fallback container');
         return;
     }
     
     // Create the simple backtest section
     const backtestSection = document.createElement('div');
     backtestSection.className = 'simple-backtest-section';
-    backtestSection.innerHTML = `
+    backtestSection.innerHTML = getBacktestUIHTML();
+    
+    // Insert after the controls
+    controlsDiv.parentNode.insertBefore(backtestSection, controlsDiv.nextSibling);
+    console.log('Backtest UI added after controls div');
+}
+
+// Separate function for UI HTML to make it reusable
+function getBacktestUIHTML() {
+    return `
         <h2>Simple Backtest Engine</h2>
         
         <div class="rule-description">
             <h4>Current Rules:</h4>
             <ul>
                 <li><strong>Entry:</strong> LONG above LPH break OR SHORT below LPL break</li>
+                <li><strong>Gap Handling:</strong> Enter at market open if gap beyond trigger level</li>
                 <li><strong>Exit 1:</strong> Stop Loss at 0.3% against position (below entry for long, above entry for short)</li>
                 <li><strong>Exit 2:</strong> End of Day (EOD) mandatory exit</li>
                 <li><strong>Daily Reset:</strong> Fresh start each day, no re-trading same levels</li>
@@ -221,9 +250,6 @@ function addSimpleBacktestUI() {
             <!-- Results will be inserted here -->
         </div>
     `;
-    
-    // Insert after the controls
-    controlsDiv.parentNode.insertBefore(backtestSection, controlsDiv.nextSibling);
 }
 
 // Set up event listeners
@@ -327,13 +353,60 @@ function handleClearResults() {
     console.log('Results cleared');
 }
 
-// Initialize when DOM is ready
+// Initialize when DOM is ready - FIXED TIMING
 document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit to ensure other scripts are loaded
-    setTimeout(initializeSimpleBacktestUI, 500);
+    console.log('DOM loaded, initializing simple backtest UI...');
+    
+    // Wait a bit longer to ensure other scripts are loaded
+    setTimeout(function() {
+        console.log('Attempting to initialize simple backtest UI...');
+        initializeSimpleBacktestUI();
+    }, 1000); // Increased delay
+});
+
+// Also try to initialize when window loads
+window.addEventListener('load', function() {
+    console.log('Window loaded, checking if UI needs initialization...');
+    
+    // Check if UI already exists
+    const existingSection = document.querySelector('.simple-backtest-section');
+    if (!existingSection) {
+        console.log('UI not found, initializing...');
+        setTimeout(initializeSimpleBacktestUI, 500);
+    } else {
+        console.log('UI already exists');
+    }
 });
 
 // Also initialize if called directly
 if (typeof window !== 'undefined') {
     window.initializeSimpleBacktestUI = initializeSimpleBacktestUI;
+    window.addSimpleBacktestUI = addSimpleBacktestUI; // Export for manual calling
+    
+    // Try immediate initialization if DOM is already ready
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        console.log('Document already ready, initializing immediately...');
+        setTimeout(initializeSimpleBacktestUI, 100);
+    }
 }
+
+// Emergency manual initialization function for console
+window.forceInitBacktestUI = function() {
+    console.log('🚨 MANUAL UI INITIALIZATION 🚨');
+    
+    // Remove existing UI if any
+    const existing = document.querySelector('.simple-backtest-section');
+    if (existing) {
+        existing.remove();
+        console.log('Removed existing UI');
+    }
+    
+    // Force create new UI
+    addSimpleBacktestUI();
+    
+    // Force setup event listeners
+    setupSimpleBacktestListeners();
+    
+    console.log('✅ Manual UI initialization complete');
+    console.log('Buttons should now be visible');
+};

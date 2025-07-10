@@ -1,13 +1,13 @@
-// simple-backtest-engine.js
+// simple-backtest-engine.js - COMPLETE FIXED VERSION WITH GAP HANDLING
 // Minimal backtesting engine for LPH/LPL break entry with stop loss and EOD exit
 
 // Global backtest state
 let backtestState = {
-    currentPosition: null, // { entryPrice, entryBar, entryRule, stopLoss, tradedLevel, levelType }
+    currentPosition: null, // { direction, entryPrice, entryBar, entryRule, stopLoss, tradedLevel, levelType }
     tradedLevelsToday: [], // [{level: price, type: 'LPH'/'LPL', barIndex: x}] - reset daily
     currentDay: null,
     trades: [], // Completed trades
-    niftyValue: 25000, // For 0.3% calculation (75 points stop loss)
+    niftyValue: 25000, // For 0.3% calculation
     isRunning: false
 };
 
@@ -86,9 +86,11 @@ function runSimpleBacktest() {
     displayResults();
 }
 
-// Handle new trading day
+// Handle new trading day - ENHANCED DEBUG
 function handleNewDay(newDate, barIndex, currentBar) {
     console.log(`\n=== NEW DAY: ${newDate} (Bar ${barIndex}) ===`);
+    console.log(`Previous day: ${backtestState.currentDay}`);
+    console.log(`Current bar: Open=${currentBar.open?.toFixed(2)}, High=${currentBar.high?.toFixed(2)}, Low=${currentBar.low?.toFixed(2)}, Close=${currentBar.close?.toFixed(2)}`);
     
     // Force EOD exit if still in position from previous day
     if (backtestState.currentPosition) {
@@ -98,9 +100,11 @@ function handleNewDay(newDate, barIndex, currentBar) {
     
     // Reset daily state
     backtestState.currentDay = newDate;
+    const previousTradedLevels = [...backtestState.tradedLevelsToday];
     backtestState.tradedLevelsToday = [];
     
-    console.log('Reset traded levels for new day');
+    console.log(`Previous day traded levels:`, previousTradedLevels);
+    console.log('Reset traded levels for new day - array is now empty');
 }
 
 // Process exit conditions
@@ -134,7 +138,7 @@ function processExits(barIndex, currentBar) {
     }
 }
 
-// Process entry conditions
+// Process entry conditions - COMPLETE GAP HANDLING FIX
 function processEntries(barIndex, currentBar, pivots) {
     // Get most recent LPH and LPL
     const recentLPH = getMostRecentPivot(pivots.lph, barIndex);
@@ -144,37 +148,84 @@ function processEntries(barIndex, currentBar, pivots) {
         return; // No pivots available yet
     }
     
+    console.log(`\n--- Bar ${barIndex} Entry Check ---`);
+    console.log(`Current Bar: Open=${currentBar.open?.toFixed(2)}, High=${currentBar.high?.toFixed(2)}, Low=${currentBar.low?.toFixed(2)}, Close=${currentBar.close?.toFixed(2)}`);
+    
     // Check LPH break for LONG entry (price breaks ABOVE LPH HIGH)
     if (recentLPH) {
         const lphHigh = window.chartData[recentLPH.barIndex].high;
+        console.log(`LPH Check: Recent LPH at Bar ${recentLPH.barIndex}, High=${lphHigh.toFixed(2)}`);
+        
         const alreadyTradedLPH = backtestState.tradedLevelsToday.some(traded => 
             Math.abs(traded.level - lphHigh) < 0.1 && traded.type === 'LPH'
         );
         
+        console.log(`LPH Already Traded Today: ${alreadyTradedLPH}`);
+        console.log(`LPH Break Check: Current High (${currentBar.high?.toFixed(2)}) > LPH High (${lphHigh.toFixed(2)}) = ${currentBar.high > lphHigh}`);
+        
         if (!alreadyTradedLPH && currentBar.high > lphHigh) {
-            const entryPrice = lphHigh + 0.5; // Entry at break level + 0.5
-            enterPosition(barIndex, currentBar, entryPrice, lphHigh, 'LPH', 'LONG');
+            let entryPrice;
+            let entryType;
+            
+            console.log(`🔍 LPH Gap Check: Current Open (${currentBar.open?.toFixed(2)}) > LPH High (${lphHigh.toFixed(2)}) = ${currentBar.open > lphHigh}`);
+            
+            if (currentBar.open > lphHigh) {
+                // Gap up scenario - market opened above LPH
+                entryPrice = currentBar.open;
+                entryType = `LONG LPH GAP entry (LPH=${lphHigh.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
+                console.log(`🔥 GAP UP DETECTED: Market opened at ${currentBar.open.toFixed(2)} above LPH ${lphHigh.toFixed(2)}`);
+            } else {
+                // Normal breakout scenario - price broke above LPH during the bar
+                entryPrice = lphHigh + 0.5;
+                entryType = `LONG LPH breakout entry (${lphHigh.toFixed(2)})`;
+                console.log(`📈 NORMAL BREAKOUT: Price broke above LPH ${lphHigh.toFixed(2)} during bar, entry at ${entryPrice.toFixed(2)}`);
+            }
+            
+            enterPosition(barIndex, currentBar, entryPrice, lphHigh, 'LPH', 'LONG', entryType);
             return; // Exit after entry to avoid multiple entries in same bar
         }
     }
     
     // Check LPL break for SHORT entry (price breaks BELOW LPL LOW)
     if (recentLPL) {
-        const lplLow = window.chartData[recentLPL.barIndex].low;  // FIXED: Use LOW not HIGH
+        const lplLow = window.chartData[recentLPL.barIndex].low;
+        console.log(`LPL Check: Recent LPL at Bar ${recentLPL.barIndex}, Low=${lplLow.toFixed(2)}`);
+        
         const alreadyTradedLPL = backtestState.tradedLevelsToday.some(traded => 
             Math.abs(traded.level - lplLow) < 0.1 && traded.type === 'LPL'
         );
         
-        if (!alreadyTradedLPL && currentBar.low < lplLow) {  // FIXED: Check if current LOW < LPL LOW
-            const entryPrice = lplLow - 0.5; // Entry at break level - 0.5
-            enterPosition(barIndex, currentBar, entryPrice, lplLow, 'LPL', 'SHORT');  // FIXED: Pass lplLow
+        console.log(`LPL Already Traded Today: ${alreadyTradedLPL}`);
+        console.log(`LPL Break Check: Current Low (${currentBar.low?.toFixed(2)}) < LPL Low (${lplLow.toFixed(2)}) = ${currentBar.low < lplLow}`);
+        
+        if (!alreadyTradedLPL && currentBar.low < lplLow) {
+            let entryPrice;
+            let entryType;
+            
+            console.log(`🔍 LPL Gap Check: Current Open (${currentBar.open?.toFixed(2)}) < LPL Low (${lplLow.toFixed(2)}) = ${currentBar.open < lplLow}`);
+            
+            if (currentBar.open < lplLow) {
+                // Gap down scenario - market opened below LPL
+                entryPrice = currentBar.open;
+                entryType = `SHORT LPL GAP entry (LPL=${lplLow.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
+                console.log(`🔥 GAP DOWN DETECTED: Market opened at ${currentBar.open.toFixed(2)} below LPL ${lplLow.toFixed(2)}`);
+            } else {
+                // Normal breakdown scenario - price broke below LPL during the bar
+                entryPrice = lplLow - 0.5;
+                entryType = `SHORT LPL breakdown entry (${lplLow.toFixed(2)})`;
+                console.log(`📉 NORMAL BREAKDOWN: Price broke below LPL ${lplLow.toFixed(2)} during bar, entry at ${entryPrice.toFixed(2)}`);
+            }
+            
+            enterPosition(barIndex, currentBar, entryPrice, lplLow, 'LPL', 'SHORT', entryType);
             return; // Exit after entry to avoid multiple entries in same bar
         }
     }
+    
+    console.log(`--- End Bar ${barIndex} Entry Check (No Entry) ---`);
 }
 
-// Enter a new position
-function enterPosition(barIndex, currentBar, entryPrice, tradedLevel, levelType, direction) {
+// Enter a new position - UPDATED FOR GAP HANDLING
+function enterPosition(barIndex, currentBar, entryPrice, tradedLevel, levelType, direction, entryType) {
     let stopLossLevel;
     
     if (direction === 'LONG') {
@@ -183,11 +234,14 @@ function enterPosition(barIndex, currentBar, entryPrice, tradedLevel, levelType,
         stopLossLevel = entryPrice + (entryPrice * 0.003); // 0.3% above entry for short
     }
     
+    // Use provided entryType or create default
+    const ruleDescription = entryType || `${direction} on ${levelType} break (${tradedLevel.toFixed(2)})`;
+    
     backtestState.currentPosition = {
         direction: direction,
         entryPrice: entryPrice,
         entryBar: barIndex,
-        entryRule: `${direction} on ${levelType} break (${tradedLevel.toFixed(2)})`,
+        entryRule: ruleDescription,
         stopLoss: stopLossLevel,
         tradedLevel: tradedLevel,
         levelType: levelType,
@@ -201,9 +255,8 @@ function enterPosition(barIndex, currentBar, entryPrice, tradedLevel, levelType,
         barIndex: barIndex
     });
     
-    console.log(`\n✅ ENTRY: Bar ${barIndex} | ${direction} at ${entryPrice.toFixed(2)} | Rule: ${levelType} break | Stop Loss: ${stopLossLevel.toFixed(2)} (0.3% = ${(entryPrice * 0.003).toFixed(2)} points)`);
+    console.log(`\n✅ ENTRY: Bar ${barIndex} | ${direction} at ${entryPrice.toFixed(2)} | Rule: ${ruleDescription} | Stop Loss: ${stopLossLevel.toFixed(2)} (0.3% = ${(entryPrice * 0.003).toFixed(2)} points)`);
 }
-
 
 // Exit current position
 function exitPosition(barIndex, currentBar, exitPrice, exitReason) {
@@ -241,7 +294,7 @@ function exitPosition(barIndex, currentBar, exitPrice, exitReason) {
     console.log(`❌ EXIT: Bar ${barIndex} | ${position.direction} at ${exitPrice.toFixed(2)} | Points: ${points.toFixed(2)} | Reason: ${exitReason}`);
 }
 
-// Get most recent pivot that occurred before current bar
+// Get most recent pivot that occurred before current bar - ENHANCED DEBUG
 function getMostRecentPivot(pivotArray, currentBarIndex) {
     if (!pivotArray || pivotArray.length === 0) return null;
     
@@ -249,15 +302,27 @@ function getMostRecentPivot(pivotArray, currentBarIndex) {
     let mostRecentPivot = null;
     let mostRecentIndex = -1;
     
+    console.log(`Looking for most recent pivot before bar ${currentBarIndex} in array:`, pivotArray);
+    
     for (let i = 0; i < pivotArray.length; i++) {
         const pivotBarIndex = pivotArray[i];
+        console.log(`  Checking pivot ${i}: Bar ${pivotBarIndex} (before current bar ${currentBarIndex}? ${pivotBarIndex < currentBarIndex})`);
+        
         if (pivotBarIndex < currentBarIndex && pivotBarIndex > mostRecentIndex) {
             mostRecentIndex = pivotBarIndex;
             mostRecentPivot = {
                 barIndex: pivotBarIndex,
                 pivotIndex: i
             };
+            console.log(`    ✓ New most recent: Bar ${pivotBarIndex}`);
         }
+    }
+    
+    if (mostRecentPivot) {
+        const pivotBar = window.chartData[mostRecentPivot.barIndex];
+        console.log(`Final most recent pivot: Bar ${mostRecentPivot.barIndex}, OHLC: O=${pivotBar.open?.toFixed(2)} H=${pivotBar.high?.toFixed(2)} L=${pivotBar.low?.toFixed(2)} C=${pivotBar.close?.toFixed(2)}`);
+    } else {
+        console.log(`No recent pivot found before bar ${currentBarIndex}`);
     }
     
     return mostRecentPivot;
