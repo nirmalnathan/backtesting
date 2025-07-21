@@ -1,9 +1,9 @@
-// simple-results.js
-// Display backtest results in a user-friendly format
+// simple-results.js - ENHANCED VERSION WITH RULE CONFIGURATION DISPLAY
+// Display backtest results in a user-friendly format with active rules shown
 
 // Display results function
 function displaySimpleResults(trades) {
-    console.log('=== DISPLAYING BACKTEST RESULTS ===');
+    console.log('=== DISPLAYING ENHANCED BACKTEST RESULTS ===');
     
     if (!trades || trades.length === 0) {
         showStatus('No trades generated in backtest', 'info');
@@ -13,7 +13,7 @@ function displaySimpleResults(trades) {
     // Calculate summary statistics
     const stats = calculateStats(trades);
     
-    // Update summary display
+    // Update summary display with rule configuration
     updateSummaryStats(stats);
     
     // Update trades table
@@ -45,6 +45,11 @@ function calculateStats(trades) {
     const maxWin = Math.max(...trades.map(t => t.points));
     const maxLoss = Math.min(...trades.map(t => t.points));
     
+    // Rule-specific statistics
+    const lphEntries = trades.filter(t => t.entryRule.includes('LPH')).length;
+    const lplEntries = trades.filter(t => t.entryRule.includes('LPL')).length;
+    const gapEntries = trades.filter(t => t.entryRule.includes('GAP')).length;
+    
     return {
         totalTrades,
         winningTrades: winningTrades.length,
@@ -57,11 +62,14 @@ function calculateStats(trades) {
         maxWin,
         maxLoss,
         eodExits: eodExits.length,
-        stopLossExits: stopLossExits.length
+        stopLossExits: stopLossExits.length,
+        lphEntries,
+        lplEntries,
+        gapEntries
     };
 }
 
-// Update summary statistics display
+// Update summary statistics display with rule configuration
 function updateSummaryStats(stats) {
     // Create or update summary section
     let summaryDiv = document.getElementById('backtest-summary');
@@ -79,8 +87,14 @@ function updateSummaryStats(stats) {
         }
     }
     
+    // Generate active rules display
+    const activeRulesHTML = generateActiveRulesHTML();
+    
     summaryDiv.innerHTML = `
         <h3>Backtest Summary</h3>
+        
+        ${activeRulesHTML}
+        
         <div class="stats-grid">
             <div class="stat-item">
                 <div class="stat-value">${stats.totalTrades}</div>
@@ -131,6 +145,147 @@ function updateSummaryStats(stats) {
                 <div class="stat-label">Stop Loss Exits</div>
             </div>
         </div>
+        
+        <div class="rule-specific-stats">
+            <h4>Rule-Specific Statistics</h4>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">${stats.lphEntries}</div>
+                    <div class="stat-label">LPH Entries</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.lplEntries}</div>
+                    <div class="stat-label">LPL Entries</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.gapEntries}</div>
+                    <div class="stat-label">Gap Entries</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+// Generate active rules HTML display
+function generateActiveRulesHTML() {
+    if (!window.ruleConfig) {
+        return '<div class="active-rules"><h4>Rules Configuration: Not Available</h4></div>';
+    }
+    
+    const entryRules = [];
+    const exitRules = [];
+    const specialFeatures = [];
+    
+    // Entry rules
+    if (window.ruleConfig.entryLphLpl) {
+        entryRules.push('✅ LPH Break Entry (LONG above LPH, SHORT below LPL)');
+    } else {
+        entryRules.push('❌ LPH Break Entry (DISABLED)');
+    }
+    
+    // Gap handling
+    if (window.ruleConfig.gapHandling) {
+        specialFeatures.push('✅ Gap Handling (Enter at market open if gap beyond trigger)');
+    } else {
+        specialFeatures.push('❌ Gap Handling (DISABLED)');
+    }
+    
+    // Exit rules
+    if (window.ruleConfig.stopLoss) {
+        exitRules.push(`✅ Stop Loss (${window.ruleConfig.stopLossPercent}% against position)`);
+    } else {
+        exitRules.push('❌ Stop Loss (DISABLED)');
+    }
+    
+    if (window.ruleConfig.eodExit) {
+        exitRules.push('✅ End of Day Exit (Mandatory close at day end)');
+    } else {
+        exitRules.push('❌ End of Day Exit (DISABLED)');
+    }
+    
+    // Daily reset
+    if (window.ruleConfig.dailyReset) {
+        specialFeatures.push('✅ Daily Reset (Fresh start each day, no re-trading levels)');
+    } else {
+        specialFeatures.push('❌ Daily Reset (DISABLED - allows re-trading same levels)');
+    }
+    
+    return `
+        <div class="active-rules">
+            <h4>Active Rules Configuration</h4>
+            <div class="rule-sections">
+                <div class="rule-section">
+                    <h5>Entry Rules</h5>
+                    <ul>
+                        ${entryRules.map(rule => `<li>${rule}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="rule-section">
+                    <h5>Exit Rules</h5>
+                    <ul>
+                        ${exitRules.map(rule => `<li>${rule}</li>`).join('')}
+                    </ul>
+                </div>
+                <div class="rule-section">
+                    <h5>Special Features</h5>
+                    <ul>
+                        ${specialFeatures.map(rule => `<li>${rule}</li>`).join('')}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+            .active-rules {
+                background: #e8f4fd;
+                padding: 15px;
+                border-radius: 8px;
+                margin: 15px 0;
+                border: 1px solid #bee5eb;
+            }
+            
+            .active-rules h4 {
+                margin: 0 0 15px 0;
+                color: #0c5460;
+                font-size: 16px;
+            }
+            
+            .rule-sections {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 20px;
+            }
+            
+            .rule-section h5 {
+                margin: 0 0 8px 0;
+                color: #495057;
+                font-size: 14px;
+                font-weight: bold;
+            }
+            
+            .rule-section ul {
+                margin: 0;
+                padding-left: 0;
+                list-style: none;
+            }
+            
+            .rule-section li {
+                margin: 5px 0;
+                font-size: 13px;
+                line-height: 1.4;
+            }
+            
+            .rule-specific-stats {
+                margin-top: 20px;
+                padding-top: 20px;
+                border-top: 1px solid #dee2e6;
+            }
+            
+            .rule-specific-stats h4 {
+                margin: 0 0 15px 0;
+                color: #495057;
+                font-size: 16px;
+            }
     `;
 }
 
