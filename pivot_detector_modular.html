@@ -1,0 +1,952 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NIFTY Pivot Point Detector - Modular Version</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: bold;
+        }
+        .controls {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        label {
+            font-weight: bold;
+            color: #555;
+            font-size: 14px;
+        }
+        .file-input input {
+            padding: 8px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            background-color: white;
+        }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        .btn.primary {
+            background-color: #3498db;
+            color: white;
+        }
+        .btn.success {
+            background-color: #27ae60;
+            color: white;
+        }
+        .btn.secondary {
+            background-color: #95a5a6;
+            color: white;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .pivot-stats {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: none;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 15px;
+        }
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e9ecef;
+        }
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            position: relative;
+            height: 600px;
+            overflow: hidden;
+        }
+        #chart {
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: grab;
+            width: 100%;
+            height: 100%;
+        }
+        #chart:active {
+            cursor: grabbing;
+        }
+        .zoom-controls {
+            position: absolute;
+            top: 30px;
+            right: 30px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .range-control {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: 5px 0;
+        }
+        .range-control label {
+            font-size: 11px;
+            min-width: 60px;
+        }
+        .range-control input {
+            width: 80px;
+        }
+        .timeframe-info {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .process-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .step-indicator {
+            font-size: 12px;
+            color: #666;
+            margin-left: 10px;
+        }
+        
+        /* Backtest UI Styles */
+        .simple-backtest-section {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+        
+        .simple-backtest-section h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+        }
+        
+        .rule-configuration {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border: 1px solid #dee2e6;
+        }
+        
+        .rule-configuration h3 {
+            color: #495057;
+            margin: 0 0 20px 0;
+            font-size: 1.2em;
+        }
+        
+        .rule-category {
+            margin-bottom: 25px;
+        }
+        
+        .rule-category h4 {
+            margin: 0 0 15px 0;
+            color: #6c757d;
+            font-size: 14px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .rule-item {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding: 12px 15px;
+            background: white;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+            min-height: 44px;
+        }
+        
+        .rule-item input[type="checkbox"] {
+            margin-right: 12px;
+            transform: scale(1.2);
+            margin-top: 2px;
+            flex-shrink: 0;
+        }
+        
+        .rule-item label {
+            flex: 1;
+            margin: 0;
+            font-size: 14px;
+            color: #495057;
+            cursor: pointer;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+        
+        .rule-input {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: 15px;
+            flex-shrink: 0;
+        }
+        
+        .rule-input input[type="number"] {
+            width: 70px;
+            padding: 4px 8px;
+            border: 1px solid #ced4da;
+            border-radius: 3px;
+            font-size: 14px;
+            text-align: center;
+        }
+        
+        .rule-input span {
+            font-size: 13px;
+            color: #6c757d;
+            white-space: nowrap;
+        }
+        
+        .not-implemented {
+            font-size: 12px;
+            color: #dc3545;
+            font-weight: normal;
+            margin-left: 10px;
+            flex-shrink: 0;
+        }
+        
+        .rule-description {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+            line-height: 1.3;
+            font-style: italic;
+        }
+        
+        .rule-item.disabled {
+            opacity: 0.6;
+            background-color: #f8f9fa;
+        }
+        
+        .rule-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .rule-controls button {
+            padding: 8px 16px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            background: white;
+            color: #495057;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .rule-controls button:hover {
+            background: #e9ecef;
+            border-color: #adb5bd;
+        }
+        
+        .simple-backtest-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .btn-primary {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary:hover {
+            background-color: #2980b9;
+            transform: translateY(-1px);
+        }
+        
+        .btn-secondary {
+            padding: 10px 20px;
+            background-color: #95a5a6;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #7f8c8d;
+            transform: translateY(-1px);
+        }
+        
+        .progress-indicator {
+            font-size: 12px;
+            color: #6c757d;
+            display: none;
+        }
+        
+        .validation-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-size: 13px;
+        }
+        
+        input.error {
+            border-color: #dc3545 !important;
+            background-color: #fff5f5;
+        }
+        
+        /* Backtest Results Styling */
+        .backtest-summary {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .backtest-summary h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 2px solid #e9ecef;
+            transition: all 0.3s ease;
+        }
+        
+        .stat-item:hover {
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Active Rules Styling */
+        .active-rules {
+            background: #f0f8ff;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #3498db;
+        }
+        
+        .active-rules h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        .rule-sections {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .rule-section h5 {
+            color: #34495e;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .rule-section ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        
+        .rule-section li {
+            padding: 5px 0;
+            font-size: 13px;
+            line-height: 1.4;
+        }
+        
+        /* Detailed Analysis Styling */
+        .detailed-analysis {
+            background: #fafafa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        
+        .detailed-analysis h4 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+        
+        .analysis-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        
+        .analysis-section {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .analysis-section h5 {
+            color: #495057;
+            margin-bottom: 12px;
+            font-size: 14px;
+        }
+        
+        .analysis-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #f1f3f4;
+        }
+        
+        .analysis-item:last-child {
+            border-bottom: none;
+        }
+        
+        .analysis-item .label {
+            font-weight: 500;
+            color: #495057;
+            font-size: 13px;
+        }
+        
+        .analysis-item .value {
+            font-weight: bold;
+            color: #2c3e50;
+            font-size: 13px;
+        }
+        
+        /* Trades Table Styling */
+        .trades-table-container {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .trades-table-container h3 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            font-size: 1.8em;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 10px;
+        }
+        
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .trades-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            background: white;
+        }
+        
+        .trades-table thead {
+            background: #34495e;
+            color: white;
+        }
+        
+        .trades-table th {
+            padding: 12px 10px;
+            text-align: left;
+            font-weight: bold;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #2c3e50;
+        }
+        
+        .trades-table td {
+            padding: 10px;
+            border-bottom: 1px solid #e9ecef;
+            vertical-align: middle;
+        }
+        
+        .trades-table tbody tr {
+            transition: all 0.2s ease;
+        }
+        
+        .trades-table tbody tr:hover {
+            background-color: #f8f9fa;
+            transform: scale(1.01);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        /* Row coloring for wins and losses */
+        .trades-table tbody tr.win {
+            background-color: #d4edda !important;
+        }
+        
+        .trades-table tbody tr.loss {
+            background-color: #f8d7da !important;
+        }
+        
+        .trades-table tbody tr.win:hover {
+            background-color: #c3e6cb !important;
+        }
+        
+        .trades-table tbody tr.loss:hover {
+            background-color: #f5c6cb !important;
+        }
+        
+        .trades-table .points {
+            font-weight: bold;
+            text-align: center;
+        }
+        
+        .trades-table .result {
+            font-weight: bold;
+            text-align: center;
+            font-size: 12px;
+        }
+        
+        .trades-table tr.win .points {
+            color: #155724;
+        }
+        
+        .trades-table tr.loss .points {
+            color: #721c24;
+        }
+        
+        .trades-table tr.win .result {
+            color: #155724;
+        }
+        
+        .trades-table tr.loss .result {
+            color: #721c24;
+        }
+        
+        /* Responsive table */
+        @media (max-width: 768px) {
+            .trades-table {
+                font-size: 11px;
+            }
+            
+            .trades-table th,
+            .trades-table td {
+                padding: 8px 6px;
+            }
+            
+            .stats-grid {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+                gap: 10px;
+            }
+            
+            .rule-sections,
+            .analysis-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NIFTY Pivot Point Detector - Modular Version</h1>
+        
+        <div class="controls">
+            <div class="file-input">
+                <label for="csvFile">Upload CSV File:</label>
+                <input type="file" id="csvFile" accept=".csv" />
+            </div>
+            
+            <div class="control-group">
+                <label for="timeframe">Timeframe:</label>
+                <div class="control-row">
+                    <select id="timeframe">
+                        <option value="1">1 Minute</option>
+                        <option value="5" selected>5 Minutes</option>
+                        <option value="15">15 Minutes</option>
+                        <option value="30">30 Minutes</option>
+                        <option value="60">1 Hour</option>
+                    </select>
+                </div>
+                <div class="timeframe-info" id="timeframeInfo"></div>
+            </div>
+            
+            <div class="control-group">
+                <label>Process Data:</label>
+                <div class="process-controls">
+                    <button class="btn primary" id="formBarsBtn">1. Form Bars</button>
+                    <button class="btn success" id="detectPivotsBtn" disabled>2. Detect Pivots</button>
+                    <span class="step-indicator">← Follow these steps in order</span>
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Chart Controls:</label>
+                <div class="control-row">
+                    <button class="btn secondary" id="resetZoomBtn">Reset Zoom</button>
+                    <button class="btn secondary" id="fitToScreenBtn">Fit to Screen</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="status" id="status"></div>
+
+        <div class="pivot-stats" id="pivotStats">
+            <div class="stat-box">
+                <div class="stat-number" id="sphCount">0</div>
+                <div class="stat-label">SPH Count</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="splCount">0</div>
+                <div class="stat-label">SPL Count</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="lphCount">0</div>
+                <div class="stat-label">LPH Count</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="lplCount">0</div>
+                <div class="stat-label">LPL Count</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-number" id="totalBars">0</div>
+                <div class="stat-label">Total Bars</div>
+            </div>
+        </div>
+
+        <!-- Modular Backtest UI will be inserted here automatically -->
+
+        <div class="chart-container" id="chartContainer">
+            <canvas id="chart"></canvas>
+            <div class="zoom-controls">
+                <div class="range-control">
+                    <label>H-Zoom:</label>
+                    <input type="range" id="hZoom" min="0.1" max="5" step="0.1" value="1">
+                    <span id="hZoomValue">1.0x</span>
+                </div>
+                <div class="range-control">
+                    <label>V-Scale:</label>
+                    <input type="range" id="vScale" min="0.5" max="3" step="0.1" value="1">
+                    <span id="vScaleValue">1.0x</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Pivot Detection Scripts -->
+    <script src="core/data-processor.js"></script>
+    <script src="core/pivot-detector.js"></script>
+    <!-- Chart Components -->
+    <script src="core/chart-base.js"></script>
+    <script src="core/chart-candlesticks.js"></script>
+    <script src="core/chart-overlays.js"></script>
+    <script src="core/chart-renderer.js"></script>
+    <script src="core/main-controller.js"></script>
+    
+    <!-- NEW Modular Backtest Scripts -->
+    <script src="backtest/rules/rule-definitions.js"></script>
+    <script src="utils/storage-manager.js"></script>
+    <script src="utils/trade-tracker.js"></script>
+    <script src="backtest/engine/rule-helpers.js"></script>
+    <script src="backtest/engine/rule-evaluator.js"></script>
+    <script src="backtest/engine/rule-validator.js"></script>
+    <script src="backtest/engine/rule-executor.js"></script>
+    <script src="backtest/engine/position-manager.js"></script>
+    <script src="backtest/engine/backtest-state-manager.js"></script>
+    <script src="backtest/engine/backtest-data-manager.js"></script>
+    <script src="backtest/engine/backtest-orchestrator.js"></script>
+    <!-- Results Display Components -->
+    <script src="backtest/ui/results-summary.js"></script>
+    <script src="backtest/ui/results-table.js"></script>
+    <script src="backtest/ui/results-charts.js"></script>
+    <script src="backtest/ui/results-export.js"></script>
+    <script src="backtest/ui/results-display.js"></script>
+    <script src="backtest/ui/rule-config-ui.js"></script>
+    
+    <!-- Simple button setup -->
+    <script>
+        // Initialize rule configuration immediately
+        window.ruleConfig = {
+            entryLphLpl: true,
+            gapHandling: true,
+            stopLoss: true,
+            stopLossPercent: 0.3,
+            eodExit: true,
+            dailyReset: true
+        };
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Setting up modular system...');
+            console.log('Rule config initialized:', window.ruleConfig);
+            
+            setTimeout(() => {
+                setupButtons();
+                console.log('Checking loaded functions...');
+                console.log('formBarsFunction:', typeof window.formBarsFunction);
+                console.log('detectPivotsFunction:', typeof window.detectPivotsFunction);
+                console.log('runBacktest:', typeof window.runBacktest);
+                console.log('RULE_DEFINITIONS:', typeof window.RULE_DEFINITIONS);
+                console.log('RuleConfigUI:', typeof window.RuleConfigUI);
+                
+                // Wait for UI to initialize, then manually setup backtest button
+                setTimeout(() => {
+                    setupBacktestButton();
+                }, 2000);
+            }, 1500);
+        });
+        
+        function setupButtons() {
+            // Form Bars button
+            const formBarsBtn = document.getElementById('formBarsBtn');
+            if (formBarsBtn) {
+                formBarsBtn.addEventListener('click', function() {
+                    console.log('Form Bars clicked');
+                    if (typeof window.formBarsFunction === 'function') {
+                        window.formBarsFunction();
+                    } else {
+                        alert('Form bars function not loaded');
+                    }
+                });
+            }
+            
+            // Detect Pivots button  
+            const detectPivotsBtn = document.getElementById('detectPivotsBtn');
+            if (detectPivotsBtn) {
+                detectPivotsBtn.addEventListener('click', function() {
+                    console.log('Detect Pivots clicked');
+                    if (typeof window.detectPivotsFunction === 'function') {
+                        window.detectPivotsFunction();
+                    } else {
+                        alert('Detect pivots function not loaded');
+                    }
+                });
+            }
+            
+            // Reset Zoom button
+            const resetZoomBtn = document.getElementById('resetZoomBtn');
+            if (resetZoomBtn) {
+                resetZoomBtn.addEventListener('click', function() {
+                    if (typeof window.resetZoomFunction === 'function') {
+                        window.resetZoomFunction();
+                    } else {
+                        alert('Reset zoom function not loaded');
+                    }
+                });
+            }
+            
+            // Fit to Screen button
+            const fitToScreenBtn = document.getElementById('fitToScreenBtn');
+            if (fitToScreenBtn) {
+                fitToScreenBtn.addEventListener('click', function() {
+                    if (typeof window.fitToScreenFunction === 'function') {
+                        window.fitToScreenFunction();
+                    } else {
+                        alert('Fit to screen function not loaded');
+                    }
+                });
+            }
+        }
+        
+        function setupBacktestButton() {
+            console.log('Setting up backtest button...');
+            
+            // Look for backtest button (it might be created by the modular UI)
+            const runBtn = document.getElementById('runSimpleBacktest') || 
+                          document.querySelector('[id*="backtest"]') ||
+                          document.querySelector('button:contains("Run")');
+            
+            if (runBtn) {
+                console.log('Found backtest button:', runBtn);
+                
+                // Remove existing listeners and add new one
+                const newBtn = runBtn.cloneNode(true);
+                runBtn.parentNode.replaceChild(newBtn, runBtn);
+                
+                newBtn.addEventListener('click', function() {
+                    console.log('=== BACKTEST BUTTON CLICKED ===');
+                    console.log('Rule config:', window.ruleConfig);
+                    console.log('Chart data:', !!window.chartData, window.chartData?.length);
+                    console.log('Pivot data:', !!window.pivotData);
+                    
+                    // Validate prerequisites
+                    if (!window.chartData || window.chartData.length === 0) {
+                        alert('Please form bars first by uploading CSV and clicking "Form Bars"');
+                        return;
+                    }
+                    
+                    if (!window.pivotData || (!window.pivotData.lph && !window.pivotData.lpl)) {
+                        alert('Please detect pivots first by clicking "Detect Pivots"');
+                        return;
+                    }
+                    
+                    if (!window.pivotData.lph?.length && !window.pivotData.lpl?.length) {
+                        alert('No LPH or LPL pivots found. Cannot run backtest.');
+                        return;
+                    }
+                    
+                    // Try different backtest function names
+                    if (typeof window.runBacktest === 'function') {
+                        console.log('✅ Calling window.runBacktest...');
+                        try {
+                            window.runBacktest();
+                        } catch (error) {
+                            console.error('Backtest error:', error);
+                            alert('Error running backtest: ' + error.message);
+                        }
+                    } else if (typeof window.runSimpleBacktest === 'function') {
+                        console.log('✅ Calling window.runSimpleBacktest...');
+                        try {
+                            window.runSimpleBacktest();
+                        } catch (error) {
+                            console.error('Backtest error:', error);
+                            alert('Error running backtest: ' + error.message);
+                        }
+                    } else {
+                        console.error('❌ No backtest function found');
+                        alert('Backtest function not loaded');
+                    }
+                });
+                
+                console.log('✅ Backtest button setup complete');
+            } else {
+                console.log('❌ Backtest button not found, will try again...');
+                // Try again in 1 second
+                setTimeout(setupBacktestButton, 1000);
+            }
+        }
+    </script>
+</body>
+</html>

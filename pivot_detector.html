@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NIFTY Pivot Point Detector with Simple Backtest</title>
+    <title>NIFTY Pivot Point Detector - Fixed Version</title>
     <style>
         * {
             margin: 0;
@@ -126,9 +126,6 @@
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
             margin-bottom: 20px;
             display: none;
-        }
-        .pivot-stats {
-            display: grid;
             grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             gap: 15px;
         }
@@ -210,13 +207,72 @@
 </head>
 <body>
     <div class="container">
-        <h1>NIFTY Pivot Point Detector with Simple Backtest</h1>
+        <h1>NIFTY Pivot Point Detector - Fixed Version</h1>
         
         <div class="controls">
             <div class="file-input">
                 <label for="csvFile">Upload CSV File:</label>
                 <input type="file" id="csvFile" accept=".csv" />
             </div>
+
+        <!-- Simple Backtest Section -->
+        <div class="simple-backtest-section" style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); margin: 20px 0;">
+            <h2>Simple Backtest Engine</h2>
+            
+            <div class="rule-configuration" style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #dee2e6;">
+                <h3>Trading Rules Configuration</h3>
+                
+                <div class="rule-category" style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px; font-weight: bold;">Entry Rules</h4>
+                    <div class="rule-item" style="display: flex; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: white; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <input type="checkbox" id="entryLphLpl" checked style="margin-right: 10px; transform: scale(1.2);">
+                        <label for="entryLphLpl" style="flex: 1; margin: 0; font-size: 14px; color: #495057; cursor: pointer;">LPH Break Entry (LONG above LPH, SHORT below LPL)</label>
+                    </div>
+                    <div class="rule-item" style="display: flex; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: white; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <input type="checkbox" id="gapHandling" checked style="margin-right: 10px; transform: scale(1.2);">
+                        <label for="gapHandling" style="flex: 1; margin: 0; font-size: 14px; color: #495057; cursor: pointer;">Gap Handling (Enter at market open if gap beyond trigger)</label>
+                    </div>
+                </div>
+                
+                <div class="rule-category" style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px; font-weight: bold;">Exit Rules</h4>
+                    <div class="rule-item" style="display: flex; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: white; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <input type="checkbox" id="stopLoss" checked style="margin-right: 10px; transform: scale(1.2);">
+                        <label for="stopLoss" style="flex: 1; margin: 0; font-size: 14px; color: #495057; cursor: pointer;">Stop Loss:</label>
+                        <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+                            <input type="number" id="stopLossPercent" value="0.3" min="0.1" max="5.0" step="0.1" style="width: 60px; padding: 4px 8px; border: 1px solid #ced4da; border-radius: 3px; font-size: 14px; text-align: center;">
+                            <span style="font-size: 14px; color: #6c757d;">% against position</span>
+                        </div>
+                    </div>
+                    <div class="rule-item" style="display: flex; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: white; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <input type="checkbox" id="eodExit" checked style="margin-right: 10px; transform: scale(1.2);">
+                        <label for="eodExit" style="flex: 1; margin: 0; font-size: 14px; color: #495057; cursor: pointer;">End of Day Exit (Mandatory close at day end)</label>
+                    </div>
+                </div>
+                
+                <div class="rule-category" style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #6c757d; font-size: 14px; font-weight: bold;">Special Features</h4>
+                    <div class="rule-item" style="display: flex; align-items: center; margin-bottom: 12px; padding: 8px 12px; background: white; border-radius: 5px; border: 1px solid #e9ecef;">
+                        <input type="checkbox" id="dailyReset" checked style="margin-right: 10px; transform: scale(1.2);">
+                        <label for="dailyReset" style="flex: 1; margin: 0; font-size: 14px; color: #495057; cursor: pointer;">Daily Reset (Fresh start each day, no re-trading levels)</label>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-top: 15px; padding-top: 15px; border-top: 1px solid #dee2e6;">
+                    <button id="resetRules" style="padding: 8px 16px; border: 1px solid #ced4da; border-radius: 4px; background: white; color: #495057; font-size: 12px; cursor: pointer;">Reset to Defaults</button>
+                    <button id="saveRules" style="padding: 8px 16px; border: 1px solid #ced4da; border-radius: 4px; background: white; color: #495057; font-size: 12px; cursor: pointer;">Save Configuration</button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; align-items: center; margin-bottom: 20px;">
+                <button id="runSimpleBacktest" class="btn primary" style="background-color: #3498db; color: white;">Run Simple Backtest</button>
+                <button id="clearSimpleResults" class="btn secondary" style="background-color: #95a5a6; color: white;">Clear Results</button>
+            </div>
+            
+            <div id="backtest-results" style="margin-top: 20px;">
+                <!-- Results will be displayed here -->
+            </div>
+        </div>
             
             <div class="control-group">
                 <label for="timeframe">Timeframe:</label>
@@ -235,8 +291,8 @@
             <div class="control-group">
                 <label>Process Data:</label>
                 <div class="process-controls">
-                    <button class="btn primary" onclick="formBars()">1. Form Bars</button>
-                    <button class="btn success" id="detectPivotsBtn" onclick="window.detectPivotsFunction()" disabled>2. Detect Pivots</button>
+                    <button class="btn primary" id="formBarsBtn">1. Form Bars</button>
+                    <button class="btn success" id="detectPivotsBtn" disabled>2. Detect Pivots</button>
                     <span class="step-indicator">← Follow these steps in order</span>
                 </div>
             </div>
@@ -244,8 +300,8 @@
             <div class="control-group">
                 <label>Chart Controls:</label>
                 <div class="control-row">
-                    <button class="btn secondary" onclick="resetZoom()">Reset Zoom</button>
-                    <button class="btn secondary" onclick="fitToScreen()">Fit to Screen</button>
+                    <button class="btn secondary" id="resetZoomBtn">Reset Zoom</button>
+                    <button class="btn secondary" id="fitToScreenBtn">Fit to Screen</button>
                 </div>
             </div>
         </div>
@@ -275,8 +331,6 @@
             </div>
         </div>
 
-        <!-- Simple Backtest Section will be inserted here by JavaScript -->
-
         <div class="chart-container" id="chartContainer">
             <canvas id="chart"></canvas>
             <div class="zoom-controls">
@@ -294,93 +348,230 @@
         </div>
     </div>
 
-    <!-- Include all JavaScript files -->
+    <!-- Core Pivot Detection Scripts with error handling -->
     <script>
-        // FIXED: Define global functions here to avoid loading issues with better debugging
-        function resetZoom() {
-            console.log('HTML resetZoom() called');
-            if (window.resetZoomFunction) {
-                console.log('Calling window.resetZoomFunction...');
-                window.resetZoomFunction();
-            } else {
-                console.error('window.resetZoomFunction not available!');
-            }
+        // Function to load script and handle errors
+        function loadScript(src, name) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => {
+                    console.log(`✅ ${name} loaded successfully from: ${src}`);
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error(`❌ ${name} failed to load from: ${src}`);
+                    reject(new Error(`Failed to load ${name}`));
+                };
+                document.head.appendChild(script);
+            });
         }
         
-        function fitToScreen() {
-            console.log('HTML fitToScreen() called');
-            if (window.fitToScreenFunction) {
-                console.log('Calling window.fitToScreenFunction...');
-                window.fitToScreenFunction();
-            } else {
-                console.error('window.fitToScreenFunction not available!');
-            }
-        }
+        // Try different path combinations
+        const pathCombinations = [
+            // Your current setup
+            { base: '/core/', desc: 'Absolute /core/ path' },
+            { base: 'core/', desc: 'Relative core/ path' },
+            { base: './core/', desc: 'Explicit relative ./core/ path' },
+            { base: '../core/', desc: 'Parent directory core/ path' },
+            // If files are in same directory
+            { base: '', desc: 'Same directory' },
+            { base: './', desc: 'Explicit same directory' }
+        ];
         
-        function formBars() {
-            console.log('HTML formBars() called');
-            console.log('window.formBarsFunction exists:', !!window.formBarsFunction);
-            console.log('typeof window.formBarsFunction:', typeof window.formBarsFunction);
+        const scriptFiles = [
+            'data-processor.js',
+            'pivot-detector.js', 
+            'chart-renderer.js',
+            'main-controller.js'
+        ];
+        
+        async function tryLoadingScripts() {
+            console.log('🔍 Attempting to load scripts from different paths...');
             
-            if (window.formBarsFunction) {
-                console.log('Calling window.formBarsFunction...');
-                window.formBarsFunction();
-            } else {
-                console.error('window.formBarsFunction not available!');
-            }
-        }
-        
-        function detectPivots() {
-            console.log('HTML detectPivots() called - THIS SHOULD NOT BE USED ANYMORE');
-            console.log('window.detectPivotsFunction exists:', !!window.detectPivotsFunction);
-            console.log('typeof window.detectPivotsFunction:', typeof window.detectPivotsFunction);
-            
-            if (window.detectPivotsFunction) {
-                console.log('Calling window.detectPivotsFunction...');
-                window.detectPivotsFunction();
-            } else {
-                console.error('window.detectPivotsFunction is not available!');
-                // Fallback: try calling detectPivotsInternal directly
-                if (typeof detectPivotsInternal === 'function') {
-                    console.log('Fallback: calling detectPivotsInternal directly');
-                    detectPivotsInternal();
-                } else {
-                    console.error('detectPivotsInternal also not available!');
+            for (const pathConfig of pathCombinations) {
+                console.log(`\n📁 Trying ${pathConfig.desc}: "${pathConfig.base}"`);
+                
+                let allLoaded = true;
+                const loadPromises = [];
+                
+                for (const file of scriptFiles) {
+                    const fullPath = pathConfig.base + file;
+                    console.log(`  📄 Attempting: ${fullPath}`);
+                    
+                    loadPromises.push(
+                        loadScript(fullPath, file).catch(error => {
+                            allLoaded = false;
+                            return Promise.resolve(); // Continue with other files
+                        })
+                    );
+                }
+                
+                await Promise.all(loadPromises);
+                
+                if (allLoaded) {
+                    console.log(`🎉 SUCCESS! All scripts loaded from: ${pathConfig.base}`);
+                    
+                    // Wait a bit for functions to initialize
+                    setTimeout(() => {
+                        setupButtons();
+                        checkLoadedFunctions();
+                    }, 500);
+                    
+                    return; // Exit - we found working path
                 }
             }
+            
+            console.error('❌ FAILED to load scripts from any path!');
+            console.log('\n🔧 TROUBLESHOOTING:');
+            console.log('1. Check your file structure:');
+            console.log('   Option A: Files in /core/ folder');
+            console.log('   Option B: Files in same directory as HTML');
+            console.log('2. Check file names exactly match');
+            console.log('3. Check browser network tab for exact error');
+            
+            // Show user-friendly error
+            const statusDiv = document.getElementById('status');
+            if (statusDiv) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>JavaScript files not found!</strong><br>
+                    Please check:<br>
+                    1. Files are in correct directory<br>
+                    2. File names match exactly<br>
+                    3. Browser console for details
+                `;
+                statusDiv.style.display = 'block';
+            }
+        }
+        
+        function checkLoadedFunctions() {
+            console.log('\n🔍 CHECKING LOADED FUNCTIONS:');
+            const expectedFunctions = [
+                'parseCSV',
+                'detectPivots', 
+                'drawChart',
+                'window.formBarsFunction',
+                'window.detectPivotsFunction',
+                'window.resetZoomFunction',
+                'window.fitToScreenFunction'
+            ];
+            
+            expectedFunctions.forEach(funcName => {
+                let exists = false;
+                let funcRef = null;
+                
+                if (funcName.startsWith('window.')) {
+                    const prop = funcName.replace('window.', '');
+                    exists = typeof window[prop] === 'function';
+                    funcRef = window[prop];
+                } else {
+                    exists = typeof window[funcName] === 'function';
+                    funcRef = window[funcName];
+                }
+                
+                console.log(`${exists ? '✅' : '❌'} ${funcName}: ${exists ? 'Available' : 'Missing'}`);
+            });
+            
+            console.log('\n📋 ALL WINDOW PROPERTIES:');
+            console.log('Functions containing "form":', Object.keys(window).filter(k => k.toLowerCase().includes('form')));
+            console.log('Functions containing "detect":', Object.keys(window).filter(k => k.toLowerCase().includes('detect')));
+            console.log('Functions containing "pivot":', Object.keys(window).filter(k => k.toLowerCase().includes('pivot')));
         }
     </script>
-    
-    <!-- Original scripts -->
-    <script src="data-processor.js"></script>
-    <script src="pivot-detector.js"></script>
-    <script src="chart-renderer.js"></script>
-    <script src="main-controller.js"></script>
-    
-    <!-- New backtest scripts -->
-    <script src="simple-backtest-engine.js"></script>
-    <script src="simple-results.js"></script>
-    <script src="simple-rule-ui.js"></script>
-    
-    <!-- Debug script to verify loading -->
+
+    <!-- Simple JavaScript for buttons -->
     <script>
-        // Debug: Check if functions are loaded
-        setTimeout(function() {
-            console.log('=== SCRIPT LOADING CHECK ===');
-            console.log('runSimpleBacktest available:', typeof window.runSimpleBacktest);
-            console.log('displaySimpleResults available:', typeof window.displaySimpleResults);
-            console.log('initializeSimpleBacktestUI available:', typeof window.initializeSimpleBacktestUI);
+        // Wait for everything to load, then setup buttons
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOM loaded, attempting to load scripts...');
+            tryLoadingScripts();
             
-            if (typeof window.runSimpleBacktest !== 'function') {
-                console.error('❌ runSimpleBacktest not loaded! Check simple-backtest-engine.js');
+            // Also setup rule configuration
+            setTimeout(() => {
+                setupRuleConfiguration();
+            }, 1500);
+        });
+        
+        function setupButtons() {
+            console.log('Setting up button event listeners...');
+            
+            // Form Bars button
+            const formBarsBtn = document.getElementById('formBarsBtn');
+            if (formBarsBtn) {
+                formBarsBtn.addEventListener('click', function() {
+                    console.log('=== Form Bars clicked ===');
+                    
+                    if (typeof window.formBarsFunction === 'function') {
+                        console.log('✅ Calling window.formBarsFunction');
+                        window.formBarsFunction();
+                    } else if (typeof formBarsInternal === 'function') {
+                        console.log('✅ Calling formBarsInternal');
+                        formBarsInternal();
+                    } else if (typeof window.formBarsInternal === 'function') {
+                        console.log('✅ Calling window.formBarsInternal');
+                        window.formBarsInternal();
+                    } else {
+                        console.error('❌ No form bars function found!');
+                        console.log('Available functions:', Object.keys(window).filter(k => k.toLowerCase().includes('form')));
+                        alert('Form bars function not loaded. Please check console for details.');
+                    }
+                });
+                console.log('✅ Form Bars button setup complete');
             }
-            if (typeof window.displaySimpleResults !== 'function') {
-                console.error('❌ displaySimpleResults not loaded! Check simple-results.js');
+            
+            // Detect Pivots button
+            const detectPivotsBtn = document.getElementById('detectPivotsBtn');
+            if (detectPivotsBtn) {
+                detectPivotsBtn.addEventListener('click', function() {
+                    console.log('=== Detect Pivots clicked ===');
+                    
+                    if (typeof window.detectPivotsFunction === 'function') {
+                        console.log('✅ Calling window.detectPivotsFunction');
+                        window.detectPivotsFunction();
+                    } else if (typeof detectPivotsInternal === 'function') {
+                        console.log('✅ Calling detectPivotsInternal');
+                        detectPivotsInternal();
+                    } else {
+                        console.error('❌ No detect pivots function found!');
+                        alert('Detect pivots function not loaded. Please check console for details.');
+                    }
+                });
+                console.log('✅ Detect Pivots button setup complete');
             }
-            if (typeof window.initializeSimpleBacktestUI !== 'function') {
-                console.error('❌ initializeSimpleBacktestUI not loaded! Check simple-rule-ui.js');
+            
+            // Reset Zoom button
+            const resetZoomBtn = document.getElementById('resetZoomBtn');
+            if (resetZoomBtn) {
+                resetZoomBtn.addEventListener('click', function() {
+                    if (typeof window.resetZoomFunction === 'function') {
+                        console.log('✅ Calling window.resetZoomFunction');
+                        window.resetZoomFunction();
+                    } else {
+                        console.error('❌ Reset zoom function not loaded');
+                        alert('Reset zoom function not loaded.');
+                    }
+                });
+                console.log('✅ Reset Zoom button setup complete');
             }
-        }, 1000);
+            
+            // Fit to Screen button
+            const fitToScreenBtn = document.getElementById('fitToScreenBtn');
+            if (fitToScreenBtn) {
+                fitToScreenBtn.addEventListener('click', function() {
+                    if (typeof window.fitToScreenFunction === 'function') {
+                        console.log('✅ Calling window.fitToScreenFunction');
+                        window.fitToScreenFunction();
+                    } else {
+                        console.error('❌ Fit to screen function not loaded');
+                        alert('Fit to screen function not loaded.');
+                    }
+                });
+                console.log('✅ Fit to Screen button setup complete');
+            }
+            
+            console.log('All buttons setup complete!');
+        }
     </script>
 </body>
 </html>

@@ -332,39 +332,8 @@ function setupChartTooltips() {
     
     console.log('Setting up chart tooltips...');
     
-    canvas.addEventListener('mousemove', function(e) {
-        // Only show tooltip when not dragging
-        if (!window.isDragging) {
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-            
-            console.log(`Mouse at: ${x}, ${y} | isDragging: ${window.isDragging}`);
-            
-            const barData = getBarAtPosition(x, y);
-            
-            if (barData) {
-                console.log('Showing tooltip for bar:', barData.index);
-                showTooltip(e.clientX, e.clientY, barData);
-            } else {
-                hideTooltip();
-            }
-        } else {
-            // Hide tooltip while dragging
-            hideTooltip();
-        }
-    });
-    
-    canvas.addEventListener('mouseleave', function() {
-        console.log('Mouse left canvas - hiding tooltip');
-        hideTooltip();
-    });
-    
-    // Also hide tooltip when starting to drag
-    canvas.addEventListener('mousedown', function() {
-        console.log('Mouse down - hiding tooltip');
-        hideTooltip();
-    });
+    // Tooltip functionality moved to chart-renderer.js to avoid duplicate listeners
+    // This prevents conflicts with pan/zoom controls
     
     console.log('Chart tooltip setup complete');
 }
