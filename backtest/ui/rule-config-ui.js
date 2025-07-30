@@ -246,8 +246,9 @@ class RuleConfigUI {
                            this.ruleConfig.stopLossPercent >= 0.1 && 
                            this.ruleConfig.stopLossPercent <= 5.0;
         const hasEodExit = this.ruleConfig.eodExit;
+        const hasTrailingSpl = this.ruleConfig.trailingSpl;
         
-        if (!hasStopLoss && !hasEodExit) {
+        if (!hasStopLoss && !hasEodExit && !hasTrailingSpl) {
             this.validationErrors.push('At least one exit rule must be enabled with valid configuration');
         }
         

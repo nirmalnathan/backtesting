@@ -88,6 +88,10 @@ class BacktestStateManager {
     updateLevelStates(currentBar, pivots) {
         // Get current LPH and LPL levels
         const data = window.chartData;
+        const currentDay = new Date(currentBar.datetime).toDateString();
+        
+        // Check for next-day gap entries (reset traded levels if new day)
+        this.checkForNextDayGapEntries(currentDay);
         
         // Update all LPH levels
         if (pivots.lph && pivots.lph.length > 0) {
@@ -102,6 +106,7 @@ class BacktestStateManager {
                             type: 'LPH',
                             status: 'available',
                             lastTradeBarIndex: -1,
+                            lastTradeDay: null,
                             needsRevalidation: false
                         });
                     }
@@ -141,6 +146,7 @@ class BacktestStateManager {
                             type: 'LPL',
                             status: 'available',
                             lastTradeBarIndex: -1,
+                            lastTradeDay: null,
                             needsRevalidation: false
                         });
                     }
@@ -168,8 +174,34 @@ class BacktestStateManager {
         }
     }
     
+    // Check for next-day gap entries - reset traded levels if it's a new day
+    checkForNextDayGapEntries(currentDay) {
+        this.state.levelStates.forEach((levelState, levelKey) => {
+            // If level was traded and it's a new day, make it available for gap entries
+            if (levelState.status === 'traded' && 
+                levelState.lastTradeDay && 
+                levelState.lastTradeDay !== currentDay) {
+                
+                levelState.status = 'available';
+                levelState.needsRevalidation = false;
+                
+                if (window.debugLogger) {
+                    window.debugLogger.pivot(`Next-day reset: ${levelKey} now available for gap entries`, {
+                        level: levelState.level,
+                        lastTradeDay: levelState.lastTradeDay,
+                        currentDay: currentDay
+                    });
+                }
+                
+                console.log(`🌅 Next-day reset: ${levelKey} now available for gap entries (traded on ${levelState.lastTradeDay}, now ${currentDay})`);
+            }
+        });
+    }
+    
     // Update level states after entry (separate method to handle entry results)
-    updateLevelStatesAfterEntry(currentBar, pivots, entryResult) {
+    updateLevelStatesAfterEntry(currentBar, pivots, entryResult, barIndex) {
+        const currentDay = new Date(currentBar.datetime).toDateString();
+        
         // Find and update the specific level that was just traded
         if (entryResult.levelType === 'LPH') {
             const levelKey = `LPH_${entryResult.tradedLevel.toFixed(2)}`;
@@ -177,7 +209,9 @@ class BacktestStateManager {
                 const levelState = this.state.levelStates.get(levelKey);
                 levelState.status = 'traded';
                 levelState.needsRevalidation = true;
-                console.log(`📝 LPH ${entryResult.tradedLevel.toFixed(2)} marked as TRADED`);
+                levelState.lastTradeBarIndex = barIndex;
+                levelState.lastTradeDay = currentDay;
+                console.log(`📝 LPH ${entryResult.tradedLevel.toFixed(2)} marked as TRADED on ${currentDay}`);
             }
         } else if (entryResult.levelType === 'LPL') {
             const levelKey = `LPL_${entryResult.tradedLevel.toFixed(2)}`;
@@ -185,7 +219,9 @@ class BacktestStateManager {
                 const levelState = this.state.levelStates.get(levelKey);
                 levelState.status = 'traded';
                 levelState.needsRevalidation = true;
-                console.log(`📝 LPL ${entryResult.tradedLevel.toFixed(2)} marked as TRADED`);
+                levelState.lastTradeBarIndex = barIndex;
+                levelState.lastTradeDay = currentDay;
+                console.log(`📝 LPL ${entryResult.tradedLevel.toFixed(2)} marked as TRADED on ${currentDay}`);
             }
         }
     }

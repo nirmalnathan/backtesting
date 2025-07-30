@@ -22,61 +22,6 @@ const RULE_DEFINITIONS = {
             implemented: true,
             dependencies: ['entryLphLpl']
         },
-        reentryAboveHigh: {
-            id: 'reentryAboveHigh',
-            label: 'Re-entry long - Long above recent high after getting stopped out',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'Re-enter LONG if price breaks above highest point reached during stopped-out trade',
-            implemented: false,
-            dependencies: ['stopLoss']
-        },
-        reentryNewSph: {
-            id: 'reentryNewSph',
-            label: 'Re-entry long - Long above new SPH above LPH',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'After exit, when new SPH forms above LPH → LONG entry',
-            implemented: false
-        },
-        reentryLphBreak: {
-            id: 'reentryLphBreak',
-            label: 'Re-entry long - again break of LPH',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'After exit from LPH break trade, re-enter LONG on LPH break again',
-            implemented: false
-        },
-        firstBarLogic: {
-            id: 'firstBarLogic',
-            label: 'Gap situation - first 30-minute bar logic',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'If gap above LPH/below LPL, wait for first 30-min bar completion before entry',
-            implemented: false
-        },
-        gapReversalSph: {
-            id: 'gapReversalSph',
-            label: 'Market gaps down below LPL and creates SPH - go long above SPH',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'Gap down below LPL, then SPH forms → LONG above SPH (reversal pattern)',
-            implemented: false
-        },
-        viceVersaShorts: {
-            id: 'viceVersaShorts',
-            label: 'Vice versa for shorts (all long rules in reverse)',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'entry',
-            description: 'Apply all long entry rules in reverse for short positions',
-            implemented: false
-        }
     },
     
     exitRules: {
@@ -116,15 +61,6 @@ const RULE_DEFINITIONS = {
             description: 'Trail stop loss to the most recent SPL level before entry for LONG, SPH level before entry for SHORT',
             implemented: true
         },
-        trailingLpl: {
-            id: 'trailingLpl',
-            label: 'Trailing SL = LPLs for LONG, LPHs for SHORT',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'exit',
-            description: 'Use large pivot levels as trailing stops for better risk management',
-            implemented: false
-        },
         aggressiveProfit: {
             id: 'aggressiveProfit',
             label: 'Enhanced Aggressive Trailing (Continuous Best Level)',
@@ -143,15 +79,6 @@ const RULE_DEFINITIONS = {
                 suffix: '% profit threshold'
             }
         },
-        aggressiveTrail: {
-            id: 'aggressiveTrail',
-            label: 'Aggressive trailing = previous bar low/high exit',
-            type: 'checkbox',
-            defaultValue: false,
-            category: 'exit',
-            description: 'Exit on previous bar low break for LONG, previous bar high break for SHORT',
-            implemented: false
-        }
     },
     
     specialFeatures: {

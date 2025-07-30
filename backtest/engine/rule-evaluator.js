@@ -26,6 +26,9 @@ class RuleEvaluator {
             return this[methodName](barIndex, currentBar, data, pivots, levelStates);
         }
         
+        if (window.debugLogger) {
+            window.debugLogger.error(`Entry rule method not found: ${ruleId}`);
+        }
         console.warn(`Entry rule method not found: ${ruleId}`);
         return { shouldEnter: false };
     }
@@ -37,18 +40,54 @@ class RuleEvaluator {
             return this[methodName](position, barIndex, currentBar, data, params);
         }
         
+        if (window.debugLogger) {
+            window.debugLogger.error(`Exit rule method not found: ${ruleId}`);
+        }
         console.warn(`Exit rule method not found: ${ruleId}`);
         return { shouldExit: false };
     }
     
     // Entry Rule: LPH/LPL Break Entry (IMPLEMENTED)
     evaluateLphLplEntry(barIndex, currentBar, data, pivots, levelStates) {
+        // Log pivot data for debugging
+        if (window.debugLogger && barIndex % 10 === 0) { // Log every 10th bar to avoid spam
+            window.debugLogger.pivot(`Bar ${barIndex}: Available pivots`, {
+                lphCount: pivots.lph?.length || 0,
+                lplCount: pivots.lpl?.length || 0,
+                lphValues: pivots.lph?.map(idx => data[idx]?.high).slice(-3) || [],
+                lplValues: pivots.lpl?.map(idx => data[idx]?.low).slice(-3) || []
+            });
+        }
+        
         // Get most recent LPH and LPL
         const recentLPH = RuleHelpers.getMostRecentPivot(pivots.lph, barIndex);
         const recentLPL = RuleHelpers.getMostRecentPivot(pivots.lpl, barIndex);
         
         if (!recentLPH && !recentLPL) {
+            if (window.debugLogger && barIndex === 52) { // Special logging for bar 52
+                window.debugLogger.pivot(`Bar ${barIndex}: No recent pivots found`, {
+                    totalLph: pivots.lph?.length || 0,
+                    totalLpl: pivots.lpl?.length || 0
+                });
+            }
             return { shouldEnter: false };
+        }
+        
+        // Special logging for bar 52 to debug the missing trade
+        if (window.debugLogger && barIndex === 52) {
+            window.debugLogger.pivot(`Bar 52: Pivot analysis`, {
+                recentLPH: recentLPH ? {
+                    barIndex: recentLPH.barIndex,
+                    value: data[recentLPH.barIndex]?.high
+                } : null,
+                recentLPL: recentLPL ? {
+                    barIndex: recentLPL.barIndex,
+                    value: data[recentLPL.barIndex]?.low
+                } : null,
+                currentBarOpen: currentBar.open,
+                currentBarLow: currentBar.low,
+                currentBarHigh: currentBar.high
+            });
         }
         
         // Check LPH break for LONG entry
@@ -60,7 +99,15 @@ class RuleEvaluator {
             const levelState = levelStates.get(levelKey);
             const canTrade = !levelState || levelState.status === 'available';
             
-            console.log(`🔍 LPH ${lphHigh.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`);
+            if (window.debugLogger) {
+                window.debugLogger.entry(`LPH ${lphHigh.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`, {
+                    level: lphHigh,
+                    status: levelState?.status,
+                    canTrade,
+                    barIndex,
+                    currentBar: { open: currentBar.open, high: currentBar.high }
+                });
+            }
             
             // Check for breakout
             if (canTrade && currentBar.high > lphHigh) {
@@ -96,7 +143,15 @@ class RuleEvaluator {
             const levelState = levelStates.get(levelKey);
             const canTrade = !levelState || levelState.status === 'available';
             
-            console.log(`🔍 LPL ${lplLow.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`);
+            if (window.debugLogger) {
+                window.debugLogger.entry(`LPL ${lplLow.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`, {
+                    level: lplLow,
+                    status: levelState?.status,
+                    canTrade,
+                    barIndex,
+                    currentBar: { open: currentBar.open, low: currentBar.low }
+                });
+            }
             
             // Check for breakdown
             if (canTrade && currentBar.low < lplLow) {
@@ -237,7 +292,72 @@ class RuleEvaluator {
         return { shouldEnter: false };
     }
     
-    // Exit Rule: Stop Loss (IMPLEMENTED)
+    // Helper: Check if stop loss should be hit based on gap-aware intrabar logic
+    shouldStopBeHit(position, currentBar, stopLevel) {
+        const isBearishBar = currentBar.close < currentBar.open;
+        const isBullishBar = currentBar.close > currentBar.open;
+        const isGapEntry = Math.abs(position.entryPrice - currentBar.open) < 0.01; // Entry at open (gap entry)
+        
+        if (window.debugLogger) {
+            window.debugLogger.exit(`Intrabar analysis`, {
+                barType: isBearishBar ? 'BEARISH' : 'BULLISH',
+                direction: position.direction,
+                isGapEntry,
+                entryPrice: position.entryPrice,
+                barOpen: currentBar.open,
+                stopLevel,
+                barHigh: currentBar.high,
+                barLow: currentBar.low
+            });
+        }
+        
+        // Gap entries: Entry at open, so high/low can occur AFTER entry
+        if (isGapEntry) {
+            const stopHit = position.direction === 'LONG' ? 
+                currentBar.low <= stopLevel : currentBar.high >= stopLevel;
+            
+            if (window.debugLogger) {
+                window.debugLogger.exit(`Gap entry logic: ${stopHit ? 'Stop hit' : 'Stop avoided'}`, {
+                    entryType: 'GAP',
+                    stopHit
+                });
+            }
+            return stopHit;
+        }
+        
+        // Normal entries: Check if bar trend matches position direction
+        if (position.direction === 'SHORT' && isBearishBar) {
+            // Bearish bar + SHORT: Open(high) → trend down → entry after breakdown
+            // High occurred BEFORE entry, stop unlikely to be hit
+            if (window.debugLogger) {
+                window.debugLogger.exit(`Bearish bar + SHORT: Stop avoided (high occurred before entry)`);
+            }
+            return false;
+        }
+        
+        if (position.direction === 'LONG' && isBullishBar) {
+            // Bullish bar + LONG: Open(low) → trend up → entry after breakout
+            // Low occurred BEFORE entry, stop unlikely to be hit
+            if (window.debugLogger) {
+                window.debugLogger.exit(`Bullish bar + LONG: Stop avoided (low occurred before entry)`);
+            }
+            return false;
+        }
+        
+        // All other cases: Use traditional stop logic
+        const stopHit = position.direction === 'LONG' ? 
+            currentBar.low <= stopLevel : currentBar.high >= stopLevel;
+            
+        if (window.debugLogger) {
+            window.debugLogger.exit(`Traditional stop logic: ${stopHit ? 'Stop hit' : 'Stop avoided'}`, {
+                reason: 'Mixed bar type and direction'
+            });
+        }
+            
+        return stopHit;
+    }
+    
+    // Exit Rule: Stop Loss (IMPLEMENTED) - With Gap-Aware Intrabar Logic
     evaluateStopLoss(position, barIndex, currentBar, data, params) {
         const stopLossPercent = params.stopLossPercent || window.ruleConfig.stopLossPercent;
         const stopLossDecimal = stopLossPercent / 100;
@@ -246,7 +366,8 @@ class RuleEvaluator {
             const stopLossPoints = position.entryPrice * stopLossDecimal;
             const stopLossLevel = RuleHelpers.roundPercentageToTick(position.entryPrice, -stopLossPoints, true);
             
-            if (currentBar.low <= stopLossLevel) {
+            // Apply gap-aware intrabar logic
+            if (this.shouldStopBeHit(position, currentBar, stopLossLevel)) {
                 return {
                     shouldExit: true,
                     exitPrice: stopLossLevel,
@@ -259,7 +380,8 @@ class RuleEvaluator {
             const stopLossLevel = position.entryPrice + stopLossPoints;
             const roundedStopLoss = Math.ceil(stopLossLevel / RuleHelpers.TICK_SIZE) * RuleHelpers.TICK_SIZE;
             
-            if (currentBar.high >= roundedStopLoss) {
+            // Apply gap-aware intrabar logic
+            if (this.shouldStopBeHit(position, currentBar, roundedStopLoss)) {
                 return {
                     shouldExit: true,
                     exitPrice: roundedStopLoss,
@@ -294,17 +416,20 @@ class RuleEvaluator {
         let trailingLevel = null;
         
         if (position.direction === 'LONG') {
-            // For LONG: Use the most recent SPL that formed BEFORE entry for trailing
-            const splBeforeEntry = RuleHelpers.getPivotsBeforeEntry(pivots.spl, position.entryBar, data);
+            // For LONG: Find SPL that formed AFTER entry and BEFORE current bar
+            // Only consider pivots that exist up to the current bar during backtest
+            const splAfterEntry = pivots.spl.filter(splBarIndex => 
+                splBarIndex > position.entryBar && splBarIndex < barIndex
+            );
             
-            if (splBeforeEntry.length > 0) {
-                // Get most recent SPL before entry
-                const mostRecentSplIndex = Math.max(...splBeforeEntry);
+            if (splAfterEntry.length > 0) {
+                // Use the MOST RECENT SPL that has formed chronologically
+                const mostRecentSplIndex = Math.max(...splAfterEntry);
                 trailingLevel = data[mostRecentSplIndex].low;
                 
-                console.log(`📊 LONG Trailing: Using SPL at bar ${mostRecentSplIndex} (${trailingLevel.toFixed(2)}) as trailing stop`);
+                console.log(`📊 LONG Trailing: Using SPL at bar ${mostRecentSplIndex} (${trailingLevel.toFixed(2)}) formed after entry at bar ${position.entryBar} as trailing stop`);
                 
-                // Exit if current price breaks below trailing SPL
+                // Check exit condition
                 if (currentBar.low <= trailingLevel) {
                     return {
                         shouldExit: true,
@@ -312,20 +437,26 @@ class RuleEvaluator {
                         exitReason: `Trailing SPL Exit (${trailingLevel.toFixed(2)})`
                     };
                 }
+            } else {
+                // No SPL formed after entry yet within current timeframe
+                console.log(`📊 LONG Trailing: No SPL formed after entry at bar ${position.entryBar} up to current bar ${barIndex}`);
             }
             
         } else { // SHORT
-            // For SHORT: Use the most recent SPH that formed BEFORE entry for trailing
-            const sphBeforeEntry = RuleHelpers.getPivotsBeforeEntry(pivots.sph, position.entryBar, data);
+            // For SHORT: Find SPH that formed AFTER entry and BEFORE current bar
+            // Only consider pivots that exist up to the current bar during backtest
+            const sphAfterEntry = pivots.sph.filter(sphBarIndex => 
+                sphBarIndex > position.entryBar && sphBarIndex < barIndex
+            );
             
-            if (sphBeforeEntry.length > 0) {
-                // Get most recent SPH before entry
-                const mostRecentSphIndex = Math.max(...sphBeforeEntry);
+            if (sphAfterEntry.length > 0) {
+                // Use the MOST RECENT SPH that has formed chronologically
+                const mostRecentSphIndex = Math.max(...sphAfterEntry);
                 trailingLevel = data[mostRecentSphIndex].high;
                 
-                console.log(`📊 SHORT Trailing: Using SPH at bar ${mostRecentSphIndex} (${trailingLevel.toFixed(2)}) as trailing stop`);
+                console.log(`📊 SHORT Trailing: Using SPH at bar ${mostRecentSphIndex} (${trailingLevel.toFixed(2)}) formed after entry at bar ${position.entryBar} as trailing stop`);
                 
-                // Exit if current price breaks above trailing SPH
+                // Check exit condition
                 if (currentBar.high >= trailingLevel) {
                     return {
                         shouldExit: true,
@@ -333,6 +464,9 @@ class RuleEvaluator {
                         exitReason: `Trailing SPH Exit (${trailingLevel.toFixed(2)})`
                     };
                 }
+            } else {
+                // No SPH formed after entry yet within current timeframe
+                console.log(`📊 SHORT Trailing: No SPH formed after entry at bar ${position.entryBar} up to current bar ${barIndex}`);
             }
         }
         

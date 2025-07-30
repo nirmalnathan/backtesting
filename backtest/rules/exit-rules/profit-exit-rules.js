@@ -2,37 +2,8 @@
 // Exit rules for taking profits
 
 const PROFIT_EXIT_RULES = {
-    // Fixed target profit exits
-    fixedTargetExit: {
-        id: 'fixedTargetExit', 
-        label: 'Fixed Target Profit Exit',
-        category: 'profit-exit',
-        implemented: false,
-        
-        evaluate: function(position, barIndex, currentBar, data) {
-            // TODO: Implement fixed target logic
-            return { shouldExit: false };
-        }
-    },
-    
-    // Trailing profit exits
-    trailingProfitExit: {
-        id: 'trailingProfitExit',
-        label: 'Trailing Profit Exit',
-        category: 'profit-exit', 
-        implemented: false,
-        
-        evaluate: function(position, barIndex, currentBar, data) {
-            // TODO: Implement trailing profit logic
-            return { shouldExit: false };
-        }
-    }
-    
-    // Ready for more profit exit rules:
-    // - Percentage-based targets
-    // - ATR-based targets
-    // - Pivot-based targets
-    // - Time-based profit exits
+    // Placeholder for future profit exit rules when implemented
+    // Will be added here when specific profit-taking strategies are implemented
 };
 
 // Export for use in rule processor

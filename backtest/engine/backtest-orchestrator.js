@@ -109,10 +109,11 @@ class BacktestOrchestrator {
         // Warn about no exit rules
         const hasStopLoss = window.ruleConfig.stopLoss;
         const hasEodExit = window.ruleConfig.eodExit;
+        const hasTrailingSpl = window.ruleConfig.trailingSpl;
         
-        if (!hasStopLoss && !hasEodExit) {
+        if (!hasStopLoss && !hasEodExit && !hasTrailingSpl) {
             const proceed = confirm(
-                'WARNING: Both Stop Loss and EOD Exit are disabled!\n\n' +
+                'WARNING: All exit rules are disabled!\n\n' +
                 'This could result in positions running indefinitely.\n\n' +
                 'Continue anyway?'
             );

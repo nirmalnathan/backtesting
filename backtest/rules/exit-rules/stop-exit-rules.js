@@ -14,18 +14,6 @@ const STOP_EXIT_RULES = {
         }
     },
     
-    // Trailing stop loss
-    trailingStopExit: {
-        id: 'trailingStopExit',
-        label: 'Trailing Stop Loss Exit',
-        category: 'stop-exit',
-        implemented: false,
-        
-        evaluate: function(position, barIndex, currentBar, data) {
-            // TODO: Implement trailing stop logic
-            return { shouldExit: false };
-        }
-    }
     
     // Ready for more stop exit rules:
     // - ATR-based stops

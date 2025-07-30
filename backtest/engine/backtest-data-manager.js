@@ -68,8 +68,33 @@ class BacktestDataManager {
                 stateManager.setCurrentPosition(newPosition);
                 
                 // Update level states with entry result and legacy traded levels
-                stateManager.updateLevelStatesAfterEntry(currentBar, pivots, entryResult);
+                stateManager.updateLevelStatesAfterEntry(currentBar, pivots, entryResult, barIndex);
                 stateManager.updateTradedLevels(entryResult);
+                
+                // Check exits again for newly entered position (important for EOD)
+                const secondExitResult = ruleProcessor.processExits(
+                    newPosition,
+                    barIndex,
+                    currentBar,
+                    data
+                );
+                
+                if (secondExitResult.shouldExit) {
+                    const completedTrade = positionManager.exitPosition(
+                        newPosition,
+                        barIndex,
+                        currentBar,
+                        secondExitResult.exitPrice,
+                        secondExitResult.exitReason,
+                        tradeTracker
+                    );
+                    
+                    // Add trade to results
+                    if (completedTrade) {
+                        stateManager.addTrade(completedTrade);
+                    }
+                    stateManager.clearCurrentPosition();
+                }
             }
         }
         

@@ -14,16 +14,18 @@ const PIVOT_ENTRY_RULES = {
         }
     },
     
-    // Placeholder for SPH above LPH rule
+    // SPH above LPH re-entry rule (IMPLEMENTED)
     entrySphAboveLph: {
         id: 'entrySphAboveLph',
-        label: 'Long on SPH above LPH or long on any SPH above LPL',
+        label: 'SPH Above LPH Re-entry (After Stop-out)',
         category: 'pivot-entry',
-        implemented: false,
+        implemented: true,
         
         evaluate: function(barIndex, currentBar, data, pivots, levelStates) {
-            // TODO: Implement in future session
-            return { shouldEnter: false };
+            return window.RuleEvaluator?.prototype.evaluateSphAboveLphEntry?.call(
+                { entryMethodMap: {}, exitMethodMap: {} },
+                barIndex, currentBar, data, pivots, levelStates
+            ) || { shouldEnter: false };
         }
     }
     
