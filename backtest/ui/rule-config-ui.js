@@ -378,16 +378,23 @@ class RuleConfigUI {
     
     // Handle clear results button
     handleClearResults() {
-        // Clear all result displays
-        const summaryDiv = document.getElementById('backtest-summary');
-        const tableDiv = document.getElementById('trades-table-container');
-        const statusDiv = document.getElementById('status');
+        // Use the proper ResultsDisplay clearResults method if available
+        if (window.resultsDisplay && typeof window.resultsDisplay.clearResults === 'function') {
+            window.resultsDisplay.clearResults();
+        } else {
+            // Fallback: Clear all result displays manually
+            const summaryDiv = document.getElementById('backtest-summary');
+            const tableDiv = document.getElementById('trades-table-container');
+            const statusDiv = document.getElementById('status');
+            const chartsContainer = document.getElementById('charts-container');
+            
+            if (summaryDiv) summaryDiv.style.display = 'none';
+            if (tableDiv) tableDiv.style.display = 'none';
+            if (statusDiv) statusDiv.style.display = 'none';
+            if (chartsContainer) chartsContainer.style.display = 'none';
+        }
         
-        if (summaryDiv) summaryDiv.style.display = 'none';
-        if (tableDiv) tableDiv.style.display = 'none';
-        if (statusDiv) statusDiv.style.display = 'none';
-        
-        console.log('Results cleared');
+        console.log('Results and charts cleared');
     }
 }
 

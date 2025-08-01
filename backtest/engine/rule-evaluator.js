@@ -368,10 +368,20 @@ class RuleEvaluator {
             
             // Apply gap-aware intrabar logic
             if (this.shouldStopBeHit(position, currentBar, stopLossLevel)) {
+                // Check for gap beyond stop loss
+                let exitPrice = stopLossLevel;
+                let exitReason = `Stop Loss LONG (${stopLossPercent}% = ${stopLossPoints.toFixed(2)} → ${stopLossLevel.toFixed(2)})`;
+                
+                // Gap handling: If market opens below stop loss, exit at market open
+                if (currentBar.open < stopLossLevel) {
+                    exitPrice = currentBar.open;
+                    exitReason = `Gap Stop Loss LONG (market opened at ${currentBar.open.toFixed(2)}, below stop ${stopLossLevel.toFixed(2)})`;
+                }
+                
                 return {
                     shouldExit: true,
-                    exitPrice: stopLossLevel,
-                    exitReason: `Stop Loss LONG (${stopLossPercent}% = ${stopLossPoints.toFixed(2)} → ${stopLossLevel.toFixed(2)})`
+                    exitPrice: exitPrice,
+                    exitReason: exitReason
                 };
             }
         } else { // SHORT  
@@ -382,10 +392,20 @@ class RuleEvaluator {
             
             // Apply gap-aware intrabar logic
             if (this.shouldStopBeHit(position, currentBar, roundedStopLoss)) {
+                // Check for gap beyond stop loss
+                let exitPrice = roundedStopLoss;
+                let exitReason = `Stop Loss SHORT (${stopLossPercent}% = ${stopLossPoints.toFixed(2)} → ${roundedStopLoss.toFixed(2)})`;
+                
+                // Gap handling: If market opens above stop loss, exit at market open
+                if (currentBar.open > roundedStopLoss) {
+                    exitPrice = currentBar.open;
+                    exitReason = `Gap Stop Loss SHORT (market opened at ${currentBar.open.toFixed(2)}, above stop ${roundedStopLoss.toFixed(2)})`;
+                }
+                
                 return {
                     shouldExit: true,
-                    exitPrice: roundedStopLoss,
-                    exitReason: `Stop Loss SHORT (${stopLossPercent}% = ${stopLossPoints.toFixed(2)} → ${roundedStopLoss.toFixed(2)})`
+                    exitPrice: exitPrice,
+                    exitReason: exitReason
                 };
             }
         }
@@ -431,10 +451,19 @@ class RuleEvaluator {
                 
                 // Check exit condition
                 if (currentBar.low <= trailingLevel) {
+                    // Gap handling: If market opens below trailing level, exit at market open
+                    let exitPrice = trailingLevel;
+                    let exitReason = `Trailing SPL Exit (${trailingLevel.toFixed(2)})`;
+                    
+                    if (currentBar.open < trailingLevel) {
+                        exitPrice = currentBar.open;
+                        exitReason = `Gap Trailing SPL Exit (market opened at ${currentBar.open.toFixed(2)}, below trail ${trailingLevel.toFixed(2)})`;
+                    }
+                    
                     return {
                         shouldExit: true,
-                        exitPrice: trailingLevel,
-                        exitReason: `Trailing SPL Exit (${trailingLevel.toFixed(2)})`
+                        exitPrice: exitPrice,
+                        exitReason: exitReason
                     };
                 }
             } else {
@@ -458,10 +487,19 @@ class RuleEvaluator {
                 
                 // Check exit condition
                 if (currentBar.high >= trailingLevel) {
+                    // Gap handling: If market opens above trailing level, exit at market open
+                    let exitPrice = trailingLevel;
+                    let exitReason = `Trailing SPH Exit (${trailingLevel.toFixed(2)})`;
+                    
+                    if (currentBar.open > trailingLevel) {
+                        exitPrice = currentBar.open;
+                        exitReason = `Gap Trailing SPH Exit (market opened at ${currentBar.open.toFixed(2)}, above trail ${trailingLevel.toFixed(2)})`;
+                    }
+                    
                     return {
                         shouldExit: true,
-                        exitPrice: trailingLevel,
-                        exitReason: `Trailing SPH Exit (${trailingLevel.toFixed(2)})`
+                        exitPrice: exitPrice,
+                        exitReason: exitReason
                     };
                 }
             } else {
@@ -486,8 +524,8 @@ class RuleEvaluator {
         // Calculate current unrealized P&L percentage
         const currentPnLPercent = RuleHelpers.getCurrentPnLPercent(position, currentBar);
         
-        // Only start trailing if profit exceeds threshold
-        if (Math.abs(currentPnLPercent) < profitThresholdPercent) {
+        // Only start trailing if profit exceeds threshold (must be actually profitable)
+        if (currentPnLPercent < profitThresholdPercent) {
             return { shouldExit: false };
         }
         
@@ -505,7 +543,8 @@ class RuleEvaluator {
         // Find best profitable trailing level from previous bars
         let bestTrailingLevel = position.aggressiveTrailingStop;
         
-        for (let i = Math.max(0, barIndex - 10); i < barIndex; i++) {
+        // Scan bars AFTER entry to find best profitable trailing level
+        for (let i = position.entryBar + 1; i < barIndex; i++) {
             const checkBar = data[i];
             const rawTrailLevel = position.direction === 'LONG' ? checkBar.low : checkBar.high;
             const trailLevel = RuleHelpers.roundToTick(rawTrailLevel);
@@ -525,9 +564,15 @@ class RuleEvaluator {
         
         // Update trailing stop if we found a better level
         if (bestTrailingLevel !== position.aggressiveTrailingStop) {
-            position.aggressiveTrailingStop = bestTrailingLevel;
+            // Validate that the trailing level gives minimum required profit
             const profitAtLevel = ((position.direction === 'LONG' ? bestTrailingLevel - position.entryPrice : position.entryPrice - bestTrailingLevel) / position.entryPrice * 100);
-            console.log(`📈 Updated aggressive trailing to ${bestTrailingLevel.toFixed(2)} (${profitAtLevel.toFixed(2)}% profit)`);
+            
+            if (profitAtLevel >= profitThresholdPercent) {
+                position.aggressiveTrailingStop = bestTrailingLevel;
+                console.log(`📈 Updated aggressive trailing to ${bestTrailingLevel.toFixed(2)} (${profitAtLevel.toFixed(2)}% profit)`);
+            } else {
+                console.log(`⚠️ Rejected trailing level ${bestTrailingLevel.toFixed(2)} - only gives ${profitAtLevel.toFixed(2)}% profit (need ${profitThresholdPercent}%)`);
+            }
         }
         
         // Check for exit condition
@@ -538,10 +583,26 @@ class RuleEvaluator {
                 
             if (shouldExit) {
                 const finalProfit = ((position.direction === 'LONG' ? position.aggressiveTrailingStop - position.entryPrice : position.entryPrice - position.aggressiveTrailingStop) / position.entryPrice * 100);
+                
+                // Gap handling for aggressive trailing
+                let exitPrice = position.aggressiveTrailingStop;
+                let exitReason = `Aggressive Trail ${position.direction} (${finalProfit.toFixed(2)}% profit at ${position.aggressiveTrailingStop.toFixed(2)})`;
+                
+                // Check for gaps beyond trailing level
+                if (position.direction === 'LONG' && currentBar.open < position.aggressiveTrailingStop) {
+                    exitPrice = currentBar.open;
+                    const gapProfit = ((currentBar.open - position.entryPrice) / position.entryPrice * 100);
+                    exitReason = `Gap Aggressive Trail LONG (market opened at ${currentBar.open.toFixed(2)}, ${gapProfit.toFixed(2)}% profit)`;
+                } else if (position.direction === 'SHORT' && currentBar.open > position.aggressiveTrailingStop) {
+                    exitPrice = currentBar.open;
+                    const gapProfit = ((position.entryPrice - currentBar.open) / position.entryPrice * 100);
+                    exitReason = `Gap Aggressive Trail SHORT (market opened at ${currentBar.open.toFixed(2)}, ${gapProfit.toFixed(2)}% profit)`;
+                }
+                
                 return {
                     shouldExit: true,
-                    exitPrice: position.aggressiveTrailingStop,
-                    exitReason: `Aggressive Trail ${position.direction} (${finalProfit.toFixed(2)}% profit at ${position.aggressiveTrailingStop.toFixed(2)})`
+                    exitPrice: exitPrice,
+                    exitReason: exitReason
                 };
             }
         }

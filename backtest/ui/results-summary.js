@@ -171,7 +171,12 @@ class ResultsSummary {
             
             ${this.generateActiveRulesHTML()}
             
-            <div class="stats-grid">
+            <div class="view-controls">
+                <button id="toggle-summary-view" class="btn-secondary">Switch to Table View</button>
+                <button id="copy-summary-table" class="btn-secondary" style="display: none;">Copy Table</button>
+            </div>
+            
+            <div id="summary-grid-view" class="stats-grid">
                 <div class="stat-item">
                     <div class="stat-value">${stats.totalTrades}</div>
                     <div class="stat-label">Total Trades</div>
@@ -238,8 +243,15 @@ class ResultsSummary {
                 </div>
             </div>
             
+            <div id="summary-table-view" style="display: none;">
+                ${this.generateSummaryTable(stats)}
+            </div>
+            
             ${this.generateDetailedAnalysisHTML(stats)}
         `;
+        
+        // Add event listeners for view switching
+        this.setupViewToggle();
     }
     
     // Generate active rules display
@@ -413,6 +425,104 @@ class ResultsSummary {
         const summaryDiv = document.getElementById('backtest-summary');
         if (summaryDiv) summaryDiv.style.display = 'none';
         this.lastStats = null;
+    }
+    
+    // Generate table format for easy copying to Excel
+    generateSummaryTable(stats) {
+        return `
+            <table id="summary-stats-table" class="summary-table" style="border-collapse: collapse; width: 100%;">
+                <thead>
+                    <tr style="background-color: #f5f5f5;">
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: left;">Metric</th>
+                        <th style="border: 1px solid #ddd; padding: 8px; text-align: right;">Value</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Total Trades</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.totalTrades}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Total Points</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.totalPoints.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Win Rate (%)</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.winRate.toFixed(1)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Avg Points/Trade</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.avgPoints.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Winning Trades</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.winningTrades}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Losing Trades</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.losingTrades}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Avg Win Points</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.avgWinPoints.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Avg Loss Points</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.avgLossPoints.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Highest Win</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.maxWin.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Highest Loss</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.maxLoss.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Profit Factor</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.profitFactor.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Calmar Ratio</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.calmarRatio.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Max DD (Points)</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.maxDrawdownPoints.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Max DD (%)</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.maxDrawdownPercent.toFixed(2)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Max DD Duration</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.maxDrawdownDuration}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Avg Duration</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.avgDuration.toFixed(1)}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">LONG Trades</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.longTrades}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">SHORT Trades</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.shortTrades}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">LPH Entries</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.lphEntries}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">LPL Entries</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.lplEntries}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Gap Entries</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.gapEntries}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">Stop Loss Exits</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.stopLossExits}</td></tr>
+                    <tr><td style="border: 1px solid #ddd; padding: 8px;">EOD Exits</td><td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${stats.eodExits}</td></tr>
+                </tbody>
+            </table>
+        `;
+    }
+    
+    // Setup view toggle functionality
+    setupViewToggle() {
+        const toggleBtn = document.getElementById('toggle-summary-view');
+        const copyBtn = document.getElementById('copy-summary-table');
+        
+        if (toggleBtn) {
+            toggleBtn.addEventListener('click', () => {
+                const gridView = document.getElementById('summary-grid-view');
+                const tableView = document.getElementById('summary-table-view');
+                
+                if (tableView.style.display === 'none') {
+                    // Switch to table view
+                    gridView.style.display = 'none';
+                    tableView.style.display = 'block';
+                    toggleBtn.textContent = 'Switch to Grid View';
+                    if (copyBtn) copyBtn.style.display = 'inline-block';
+                } else {
+                    // Switch to grid view
+                    gridView.style.display = 'block';
+                    tableView.style.display = 'none';
+                    toggleBtn.textContent = 'Switch to Table View';
+                    if (copyBtn) copyBtn.style.display = 'none';
+                }
+            });
+        }
+        
+        if (copyBtn) {
+            copyBtn.addEventListener('click', () => {
+                this.copyTableToClipboard();
+            });
+        }
+    }
+    
+    // Copy table data to clipboard in Excel-friendly format
+    copyTableToClipboard() {
+        const table = document.getElementById('summary-stats-table');
+        if (!table) return;
+        
+        let tableText = '';
+        const rows = table.querySelectorAll('tr');
+        
+        rows.forEach(row => {
+            const cells = row.querySelectorAll('th, td');
+            const rowText = Array.from(cells).map(cell => cell.textContent.trim()).join('\t');
+            tableText += rowText + '\n';
+        });
+        
+        navigator.clipboard.writeText(tableText).then(() => {
+            const originalText = document.getElementById('copy-summary-table').textContent;
+            document.getElementById('copy-summary-table').textContent = 'Copied!';
+            setTimeout(() => {
+                document.getElementById('copy-summary-table').textContent = originalText;
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            alert('Failed to copy to clipboard. Please select the table manually and copy.');
+        });
     }
 }
 

@@ -155,20 +155,35 @@ function detectPivots(data) {
                     if (currentHigh > refSPHHigh) {
                         console.log(`🔴 Bar ${barIdx} (high=${currentHigh.toFixed(2)}) BREAKS SPH${currentSPHRefIdx} at Bar ${refSPHBarIdx} (high=${refSPHHigh.toFixed(2)})`);
                         
-                        // Find the latest SPL that occurs just before this breaking bar
-                        let latestSPLBarIdx = -1;
+                        // Find all SPLs after the most recent LPH, then pick the lowest one
+                        let mostRecentLPHBarIdx = -1;
+                        if (finalLPH.length > 0) {
+                            mostRecentLPHBarIdx = Math.max(...finalLPH);
+                        }
                         
+                        let candidateSPLs = [];
                         for (let splIdx = 0; splIdx < finalSPL.length; splIdx++) {
                             const splBarIdx = finalSPL[splIdx];
-                            if (splBarIdx < barIdx && splBarIdx > latestSPLBarIdx) {
-                                latestSPLBarIdx = splBarIdx;
+                            if (splBarIdx < barIdx && splBarIdx > mostRecentLPHBarIdx) {
+                                candidateSPLs.push(splBarIdx);
                             }
                         }
                         
-                        // Mark the latest SPL as LPL if found and not already marked
-                        if (latestSPLBarIdx !== -1 && !finalLPL.includes(latestSPLBarIdx)) {
-                            finalLPL.push(latestSPLBarIdx);
-                            console.log(`✅ LPL MARKED at Bar ${latestSPLBarIdx} (low=${data[latestSPLBarIdx].low.toFixed(2)}) - latest SPL before break`);
+                        // Find the lowest SPL among candidates
+                        let lowestSPLBarIdx = -1;
+                        let lowestPrice = Infinity;
+                        
+                        for (let splBarIdx of candidateSPLs) {
+                            if (data[splBarIdx].low < lowestPrice) {
+                                lowestPrice = data[splBarIdx].low;
+                                lowestSPLBarIdx = splBarIdx;
+                            }
+                        }
+                        
+                        // Mark the lowest SPL as LPL if found and not already marked
+                        if (lowestSPLBarIdx !== -1 && !finalLPL.includes(lowestSPLBarIdx)) {
+                            finalLPL.push(lowestSPLBarIdx);
+                            console.log(`✅ LPL MARKED at Bar ${lowestSPLBarIdx} (low=${data[lowestSPLBarIdx].low.toFixed(2)}) - lowest SPL after most recent LPH`);
                             
                             // Rule 2: Switch to LPH detection
                             expectingLPL = false;
@@ -207,20 +222,35 @@ function detectPivots(data) {
                     if (currentLow < refSPLLow) {
                         console.log(`🔵 Bar ${barIdx} (low=${currentLow.toFixed(2)}) BREAKS SPL${currentSPLRefIdx} at Bar ${refSPLBarIdx} (low=${refSPLLow.toFixed(2)})`);
                         
-                        // Find the latest SPH that occurs just before this breaking bar
-                        let latestSPHBarIdx = -1;
+                        // Find all SPHs after the most recent LPL, then pick the highest one
+                        let mostRecentLPLBarIdx = -1;
+                        if (finalLPL.length > 0) {
+                            mostRecentLPLBarIdx = Math.max(...finalLPL);
+                        }
                         
+                        let candidateSPHs = [];
                         for (let sphIdx = 0; sphIdx < finalSPH.length; sphIdx++) {
                             const sphBarIdx = finalSPH[sphIdx];
-                            if (sphBarIdx < barIdx && sphBarIdx > latestSPHBarIdx) {
-                                latestSPHBarIdx = sphBarIdx;
+                            if (sphBarIdx < barIdx && sphBarIdx > mostRecentLPLBarIdx) {
+                                candidateSPHs.push(sphBarIdx);
                             }
                         }
                         
-                        // Mark the latest SPH as LPH if found and not already marked
-                        if (latestSPHBarIdx !== -1 && !finalLPH.includes(latestSPHBarIdx)) {
-                            finalLPH.push(latestSPHBarIdx);
-                            console.log(`✅ LPH MARKED at Bar ${latestSPHBarIdx} (high=${data[latestSPHBarIdx].high.toFixed(2)}) - latest SPH before break`);
+                        // Find the highest SPH among candidates
+                        let highestSPHBarIdx = -1;
+                        let highestPrice = -Infinity;
+                        
+                        for (let sphBarIdx of candidateSPHs) {
+                            if (data[sphBarIdx].high > highestPrice) {
+                                highestPrice = data[sphBarIdx].high;
+                                highestSPHBarIdx = sphBarIdx;
+                            }
+                        }
+                        
+                        // Mark the highest SPH as LPH if found and not already marked
+                        if (highestSPHBarIdx !== -1 && !finalLPH.includes(highestSPHBarIdx)) {
+                            finalLPH.push(highestSPHBarIdx);
+                            console.log(`✅ LPH MARKED at Bar ${highestSPHBarIdx} (high=${data[highestSPHBarIdx].high.toFixed(2)}) - highest SPH after most recent LPL`);
                             
                             // Rule 2: Switch to LPL detection
                             expectingLPL = true;
