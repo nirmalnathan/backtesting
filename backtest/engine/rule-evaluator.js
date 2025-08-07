@@ -97,7 +97,9 @@ class RuleEvaluator {
             
             // Check level state (new re-entry logic)
             const levelState = levelStates.get(levelKey);
-            const canTrade = !levelState || levelState.status === 'available';
+            const canTrade = !levelState || 
+                           (levelState.status === 'available' && !levelState.needsRevalidation) || 
+                           (levelState.status === 'traded' && !levelState.needsRevalidation);
             
             if (window.debugLogger) {
                 window.debugLogger.entry(`LPH ${lphHigh.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`, {
@@ -113,8 +115,8 @@ class RuleEvaluator {
             if (canTrade && currentBar.high > lphHigh) {
                 let entryPrice, entryType;
                 
-                // Gap handling
-                if (window.ruleConfig.gapHandling && currentBar.open > lphHigh) {
+                // Gap handling - ONLY at start of trading day
+                if (window.ruleConfig.gapHandling && currentBar.open > lphHigh && this.isStartOfTradingDay(barIndex, data)) {
                     entryPrice = currentBar.open;
                     entryType = `LONG LPH GAP entry (LPH=${lphHigh.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
                 } else {
@@ -141,24 +143,32 @@ class RuleEvaluator {
             
             // Check level state (new re-entry logic)
             const levelState = levelStates.get(levelKey);
-            const canTrade = !levelState || levelState.status === 'available';
+            const canTrade = !levelState || 
+                           (levelState.status === 'available' && !levelState.needsRevalidation) || 
+                           (levelState.status === 'traded' && !levelState.needsRevalidation);
             
             if (window.debugLogger) {
-                window.debugLogger.entry(`LPL ${lplLow.toFixed(2)} - Status: ${levelState?.status || 'new'}, Can trade: ${canTrade}`, {
+                window.debugLogger.entry(`LPL ${lplLow.toFixed(2)} - Status: ${levelState?.status || 'new'}, NeedsRevalidation: ${levelState?.needsRevalidation || false}, Can trade: ${canTrade}`, {
                     level: lplLow,
                     status: levelState?.status,
+                    needsRevalidation: levelState?.needsRevalidation,
                     canTrade,
                     barIndex,
                     currentBar: { open: currentBar.open, low: currentBar.low }
                 });
             }
             
+            // Add console logging for retest blocking
+            if (!canTrade && levelState?.needsRevalidation) {
+                console.log(`🚫 ENTRY BLOCKED: LPL ${lplLow.toFixed(2)} requires retest (level status: ${levelState.status}, needsRevalidation: ${levelState.needsRevalidation})`);
+            }
+            
             // Check for breakdown
             if (canTrade && currentBar.low < lplLow) {
                 let entryPrice, entryType;
                 
-                // Gap handling
-                if (window.ruleConfig.gapHandling && currentBar.open < lplLow) {
+                // Gap handling - ONLY at start of trading day
+                if (window.ruleConfig.gapHandling && currentBar.open < lplLow && this.isStartOfTradingDay(barIndex, data)) {
                     entryPrice = currentBar.open;
                     entryType = `SHORT LPL GAP entry (LPL=${lplLow.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
                 } else {
@@ -209,15 +219,17 @@ class RuleEvaluator {
                     
                     // Check level state
                     const levelState = levelStates.get(levelKey);
-                    const canTrade = !levelState || levelState.status === 'available';
+                    const canTrade = !levelState || 
+                                   (levelState.status === 'available' && !levelState.needsRevalidation) || 
+                                   (levelState.status === 'traded' && !levelState.needsRevalidation);
                     
                     if (canTrade) {
                         // Entry condition: price breaks above SPH level
                         if (currentBar.high > sphLevel) {
                             let entryPrice, entryType;
                             
-                            // Gap handling
-                            if (window.ruleConfig.gapHandling && currentBar.open > sphLevel) {
+                            // Gap handling - ONLY at start of trading day
+                            if (window.ruleConfig.gapHandling && currentBar.open > sphLevel && this.isStartOfTradingDay(barIndex, data)) {
                                 entryPrice = currentBar.open;
                                 entryType = `LONG SPH GAP re-entry (SPH=${sphLevel.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
                             } else {
@@ -251,15 +263,17 @@ class RuleEvaluator {
                     
                     // Check level state
                     const levelState = levelStates.get(levelKey);
-                    const canTrade = !levelState || levelState.status === 'available';
+                    const canTrade = !levelState || 
+                                   (levelState.status === 'available' && !levelState.needsRevalidation) || 
+                                   (levelState.status === 'traded' && !levelState.needsRevalidation);
                     
                     if (canTrade) {
                         // Entry condition: price breaks below SPL level
                         if (currentBar.low < splLevel) {
                             let entryPrice, entryType;
                             
-                            // Gap handling
-                            if (window.ruleConfig.gapHandling && currentBar.open < splLevel) {
+                            // Gap handling - ONLY at start of trading day
+                            if (window.ruleConfig.gapHandling && currentBar.open < splLevel && this.isStartOfTradingDay(barIndex, data)) {
                                 entryPrice = currentBar.open;
                                 entryType = `SHORT SPL GAP re-entry (SPL=${splLevel.toFixed(2)}, opened at ${currentBar.open.toFixed(2)})`;
                             } else {
@@ -460,6 +474,7 @@ class RuleEvaluator {
                         exitReason = `Gap Trailing SPL Exit (market opened at ${currentBar.open.toFixed(2)}, below trail ${trailingLevel.toFixed(2)})`;
                     }
                     
+                    
                     return {
                         shouldExit: true,
                         exitPrice: exitPrice,
@@ -495,6 +510,7 @@ class RuleEvaluator {
                         exitPrice = currentBar.open;
                         exitReason = `Gap Trailing SPH Exit (market opened at ${currentBar.open.toFixed(2)}, above trail ${trailingLevel.toFixed(2)})`;
                     }
+                    
                     
                     return {
                         shouldExit: true,
@@ -599,6 +615,7 @@ class RuleEvaluator {
                     exitReason = `Gap Aggressive Trail SHORT (market opened at ${currentBar.open.toFixed(2)}, ${gapProfit.toFixed(2)}% profit)`;
                 }
                 
+                
                 return {
                     shouldExit: true,
                     exitPrice: exitPrice,
@@ -614,6 +631,37 @@ class RuleEvaluator {
     evaluateTrailingLpl(position, barIndex, currentBar, data, params) {
         // Placeholder for future implementation
         return { shouldExit: false };
+    }
+    
+    // Helper: Check if current bar is at start of trading day (for gap entries)
+    isStartOfTradingDay(barIndex, data) {
+        // Gap entries should only be allowed in the first few bars of a new trading day
+        if (barIndex === 0) return true; // First bar is always start of day
+        
+        // Check if this is a different day from the previous bar
+        const currentBar = data[barIndex];
+        const previousBar = data[barIndex - 1];
+        
+        if (!currentBar.datetime || !previousBar.datetime) return false;
+        
+        const currentDate = new Date(currentBar.datetime).toDateString();
+        const previousDate = new Date(previousBar.datetime).toDateString();
+        
+        // Allow gap entries only within first 2 bars of a new day
+        if (currentDate !== previousDate) {
+            // Check if this is within first 2 bars of the new day
+            let newDayBarCount = 1;
+            for (let i = barIndex - 1; i >= 0; i--) {
+                const checkDate = new Date(data[i].datetime).toDateString();
+                if (checkDate === currentDate) {
+                    newDayBarCount = barIndex - i + 1;
+                    break;
+                }
+            }
+            return newDayBarCount <= 2; // Only first 2 bars of new day
+        }
+        
+        return false; // Not a new day
     }
     
 }

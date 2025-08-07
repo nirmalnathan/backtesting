@@ -7,7 +7,7 @@ class ChartCandlesticks {
     }
     
     // Draw all candlesticks
-    drawCandlesticks(data, priceScaling, barWidth) {
+    drawCandlesticks(data, priceScaling, barWidth, barSpacing) {
         if (!this.chartBase.ctx || !data || data.length === 0) return;
         
         const { adjustedMaxPrice, priceRange } = priceScaling;
@@ -19,7 +19,7 @@ class ChartCandlesticks {
         
         for (let i = 0; i < data.length; i++) {
             const bar = data[i];
-            const x = this.chartBase.margin.left + (i * barWidth);
+            const x = this.chartBase.margin.left + (i * barSpacing); // Use barSpacing for positioning
             
             // Calculate Y positions using base chart methods
             const openY = this.chartBase.priceToY(bar.open, adjustedMaxPrice, priceRange) - panY;
@@ -33,38 +33,39 @@ class ChartCandlesticks {
         this.chartBase.ctx.restore();
     }
     
-    // Draw a single candlestick
+    // Draw a single OHLC bar
     drawSingleCandlestick(x, openY, closeY, highY, lowY, barWidth, bar) {
         const ctx = this.chartBase.ctx;
         
-        // Determine color
+        // Determine color based on price direction
         const isGreen = bar.close > bar.open;
-        ctx.fillStyle = isGreen ? '#4CAF50' : '#F44336';
         ctx.strokeStyle = isGreen ? '#4CAF50' : '#F44336';
-        
-        // Draw high-low line (wick)
         ctx.lineWidth = 1;
+        
+        const centerX = x + barWidth / 2;
+        const tickLength = Math.max(2, barWidth / 3); // Horizontal tick length
+        
+        // Draw main vertical line (High to Low)
         ctx.beginPath();
-        ctx.moveTo(x + barWidth / 2, highY);
-        ctx.lineTo(x + barWidth / 2, lowY);
+        ctx.moveTo(centerX, highY);
+        ctx.lineTo(centerX, lowY);
         ctx.stroke();
         
-        // Draw body
-        const bodyTop = Math.min(openY, closeY);
-        const bodyHeight = Math.abs(closeY - openY);
-        const bodyWidth = Math.max(1, barWidth - 2);
-        const minBodyHeight = Math.max(1, bodyHeight);
+        // Draw Open tick (left side)
+        ctx.beginPath();
+        ctx.moveTo(centerX - tickLength, openY);
+        ctx.lineTo(centerX, openY);
+        ctx.stroke();
         
-        ctx.fillRect(x + 1, bodyTop, bodyWidth, minBodyHeight);
-        
-        // Draw thin outline for better visibility
-        ctx.strokeStyle = isGreen ? '#2E7D32' : '#C62828';
-        ctx.lineWidth = 0.5;
-        ctx.strokeRect(x + 1, bodyTop, bodyWidth, minBodyHeight);
+        // Draw Close tick (right side)
+        ctx.beginPath();
+        ctx.moveTo(centerX, closeY);
+        ctx.lineTo(centerX + tickLength, closeY);
+        ctx.stroke();
     }
     
     // Draw volume bars (if volume data available)
-    drawVolumeBars(data, barWidth, volumeHeight = 60) {
+    drawVolumeBars(data, barWidth, barSpacing, volumeHeight = 60) {
         if (!this.chartBase.ctx || !data || data.length === 0) return;
         
         const ctx = this.chartBase.ctx;
@@ -88,7 +89,7 @@ class ChartCandlesticks {
             const bar = data[i];
             if (!bar.volume) continue;
             
-            const x = this.chartBase.margin.left + (i * barWidth);
+            const x = this.chartBase.margin.left + (i * barSpacing); // Use barSpacing for positioning
             const volumeBarHeight = (bar.volume / maxVolume) * volumeHeight;
             const y = volumeTop + volumeHeight - volumeBarHeight;
             
@@ -129,17 +130,17 @@ class ChartCandlesticks {
     }
     
     // Get candlestick at mouse position
-    getCandlestickAtPosition(data, mouseX, barWidth) {
-        const index = this.chartBase.xToIndex(mouseX, barWidth);
+    getCandlestickAtPosition(data, mouseX, barSpacing) {
+        const index = this.chartBase.xToIndex(mouseX, barSpacing);
         return this.getCandlestickAtIndex(data, index);
     }
     
     // Check if mouse is over a candlestick
-    isMouseOverCandlestick(mouseX, mouseY, index, data, barWidth, priceScaling) {
+    isMouseOverCandlestick(mouseX, mouseY, index, data, barWidth, barSpacing, priceScaling) {
         if (!data || index < 0 || index >= data.length) return false;
         
         const bar = data[index];
-        const x = this.chartBase.indexToX(index, barWidth);
+        const x = this.chartBase.indexToX(index, barSpacing);
         const { adjustedMaxPrice, priceRange } = priceScaling;
         
         const highY = this.chartBase.priceToY(bar.high, adjustedMaxPrice, priceRange);
@@ -150,12 +151,12 @@ class ChartCandlesticks {
     }
     
     // Highlight candlestick
-    highlightCandlestick(index, data, barWidth, priceScaling) {
+    highlightCandlestick(index, data, barWidth, barSpacing, priceScaling) {
         if (!this.chartBase.ctx || !data || index < 0 || index >= data.length) return;
         
         const ctx = this.chartBase.ctx;
         const bar = data[index];
-        const x = this.chartBase.indexToX(index, barWidth);
+        const x = this.chartBase.indexToX(index, barSpacing);
         const { adjustedMaxPrice, priceRange } = priceScaling;
         
         const openY = this.chartBase.priceToY(bar.open, adjustedMaxPrice, priceRange);

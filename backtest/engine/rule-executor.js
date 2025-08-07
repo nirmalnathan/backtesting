@@ -38,14 +38,17 @@ class RuleExecutor {
         return { shouldEnter: false };
     }
     
-    // Process all exit rules dynamically
+    // Process all exit rules dynamically - evaluate ALL rules and choose best exit
     processExits(position, barIndex, currentBar, data) {
         const config = window.ruleConfig;
         
         // Get all implemented exit rules from definitions
         const implementedExitRules = this.ruleValidator.getImplementedRules('exitRules');
         
-        // Process each implemented exit rule
+        let bestExit = null;
+        const allExitResults = [];
+        
+        // Evaluate ALL implemented exit rules
         for (const ruleId of Object.keys(implementedExitRules)) {
             // Check if rule is enabled in config
             if (!config[ruleId]) continue;
@@ -64,9 +67,27 @@ class RuleExecutor {
             );
             
             if (result.shouldExit) {
-                console.log(`❌ EXIT: ${result.exitReason}`);
-                return result;
+                allExitResults.push({...result, ruleId});
+                
+                // Choose the best exit based on position direction
+                if (!bestExit || this.isBetterExit(result, bestExit, position.direction)) {
+                    bestExit = {...result, ruleId};
+                }
             }
+        }
+        
+        // Log all potential exits for debugging
+        if (allExitResults.length > 1) {
+            console.log(`🎯 Multiple exit signals at bar ${barIndex}:`);
+            allExitResults.forEach(exit => {
+                console.log(`  - ${exit.ruleId}: ${exit.exitPrice} (${exit.exitReason})`);
+            });
+            console.log(`  → Chose: ${bestExit.ruleId} at ${bestExit.exitPrice}`);
+        }
+        
+        if (bestExit) {
+            console.log(`❌ EXIT: ${bestExit.exitReason}`);
+            return bestExit;
         }
         
         return { shouldExit: false };
@@ -97,6 +118,17 @@ class RuleExecutor {
         }
         
         return params;
+    }
+    
+    // Determine if one exit is better than another based on position direction
+    isBetterExit(newExit, currentBest, direction) {
+        // For LONG positions: Higher exit price is better (more profit/less loss)
+        // For SHORT positions: Lower exit price is better (more profit/less loss)
+        if (direction === 'LONG') {
+            return newExit.exitPrice > currentBest.exitPrice;
+        } else { // SHORT
+            return newExit.exitPrice < currentBest.exitPrice;
+        }
     }
     
     // Validate configuration before processing

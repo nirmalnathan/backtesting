@@ -51,18 +51,19 @@ function drawChart(data, pivots) {
     // Calculate scaling and dimensions
     const priceScaling = chartBase.calculatePriceScaling(data);
     const barWidth = chartBase.calculateBarWidth(data);
+    const barSpacing = chartBase.calculateBarSpacing(data);
     
     // Draw axes and grid
     const shiftedPrices = chartBase.drawYAxisGrid(priceScaling);
-    chartBase.drawXAxis(data, barWidth);
+    chartBase.drawXAxis(data, barSpacing);
     
     // Draw chart content
-    chartCandlesticks.drawCandlesticks(data, priceScaling, barWidth);
-    chartOverlays.drawPivots(data, pivots, priceScaling, barWidth);
+    chartCandlesticks.drawCandlesticks(data, priceScaling, barWidth, barSpacing);
+    chartOverlays.drawPivots(data, pivots, priceScaling, barSpacing);
     
     // Draw crosshair if mouse is over chart
     if (showCrosshair) {
-        chartOverlays.drawCrosshair(data, mouseX, mouseY, priceScaling, barWidth);
+        chartOverlays.drawCrosshair(data, mouseX, mouseY, priceScaling, barSpacing);
     }
     
     console.log('=== END CHART RENDERER DEBUG ===\n');

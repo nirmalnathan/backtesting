@@ -105,6 +105,20 @@ class ChartBase {
         return Math.max(2, (chartDimensions.width / data.length) * hZoom);
     }
     
+    // Calculate bar spacing (for positioning) - separate from bar width
+    calculateBarSpacing(data) {
+        const hZoom = parseFloat(document.getElementById('hZoom').value);
+        const chartDimensions = this.getChartDimensions();
+        
+        // Calculate base spacing from available space and zoom
+        const baseSpacing = (chartDimensions.width / data.length) * hZoom;
+        
+        // Ensure minimum spacing for visibility
+        const minSpacing = 8; // Minimum 8px spacing between bar centers
+        
+        return Math.max(minSpacing, baseSpacing);
+    }
+    
     // Draw Y-axis grid and labels
     drawYAxisGrid(priceScaling) {
         if (!this.ctx) return;
@@ -142,7 +156,7 @@ class ChartBase {
     }
     
     // Draw X-axis with time labels
-    drawXAxis(data, barWidth) {
+    drawXAxis(data, barSpacing) {
         if (!this.ctx || !data.length) return;
         
         const chartDimensions = this.getChartDimensions();
@@ -162,7 +176,7 @@ class ChartBase {
         this.ctx.textAlign = 'center';
         
         for (let i = 0; i < data.length; i += labelInterval) {
-            const x = this.margin.left + (i * barWidth) + panX;
+            const x = this.margin.left + (i * barSpacing) + panX; // Use barSpacing for positioning
             
             if (x >= this.margin.left && x <= this.canvas.width - this.margin.right) {
                 // Fix: Use correct datetime field
@@ -216,13 +230,13 @@ class ChartBase {
     }
     
     // Convert index to X coordinate
-    indexToX(index, barWidth) {
-        return this.margin.left + (index * barWidth) + panX;
+    indexToX(index, barSpacing) {
+        return this.margin.left + (index * barSpacing) + panX;
     }
     
     // Convert X coordinate to index
-    xToIndex(x, barWidth) {
-        return Math.floor((x - this.margin.left - panX) / barWidth);
+    xToIndex(x, barSpacing) {
+        return Math.floor((x - this.margin.left - panX) / barSpacing);
     }
     
     // Get mouse position relative to chart area

@@ -7,7 +7,7 @@ class ChartOverlays {
     }
     
     // Draw all pivot markers
-    drawPivots(data, pivots, priceScaling, barWidth) {
+    drawPivots(data, pivots, priceScaling, barSpacing) {
         if (!this.chartBase.ctx || !pivots || !data) return;
         
         console.log('\n🔵 Starting pivot rendering...');
@@ -19,17 +19,17 @@ class ChartOverlays {
         this.chartBase.ctx.translate(panX, panY);
         
         // Draw all pivot types with proper spacing
-        this.drawPivotType(data, pivots.sph || [], '#ff6b6b', 'SPH', true, false, adjustedMaxPrice, priceRange, barWidth);
-        this.drawPivotType(data, pivots.spl || [], '#4ecdc4', 'SPL', false, false, adjustedMaxPrice, priceRange, barWidth);
-        this.drawPivotType(data, pivots.lph || [], '#0000ff', 'LPH', true, true, adjustedMaxPrice, priceRange, barWidth);
-        this.drawPivotType(data, pivots.lpl || [], '#ff00ff', 'LPL', false, true, adjustedMaxPrice, priceRange, barWidth);
+        this.drawPivotType(data, pivots.sph || [], '#ff6b6b', 'SPH', true, false, adjustedMaxPrice, priceRange, barSpacing);
+        this.drawPivotType(data, pivots.spl || [], '#4ecdc4', 'SPL', false, false, adjustedMaxPrice, priceRange, barSpacing);
+        this.drawPivotType(data, pivots.lph || [], '#0000ff', 'LPH', true, true, adjustedMaxPrice, priceRange, barSpacing);
+        this.drawPivotType(data, pivots.lpl || [], '#ff00ff', 'LPL', false, true, adjustedMaxPrice, priceRange, barSpacing);
         
         this.chartBase.ctx.restore();
         console.log('🔵 Finished pivot rendering');
     }
     
     // Draw specific pivot type
-    drawPivotType(data, pivotIndices, color, label, isHigh, isLargePivot, adjustedMaxPrice, priceRange, barWidth) {
+    drawPivotType(data, pivotIndices, color, label, isHigh, isLargePivot, adjustedMaxPrice, priceRange, barSpacing) {
         console.log(`\n--- Drawing ${label} pivots ---`);
         console.log(`Color: ${color}, IsHigh: ${isHigh}, IsLarge: ${isLargePivot}`);
         console.log(`Pivot indices:`, pivotIndices);
@@ -66,7 +66,7 @@ class ChartOverlays {
                 return;
             }
             
-            const x = this.chartBase.margin.left + (index * barWidth) + barWidth / 2;
+            const x = this.chartBase.margin.left + (index * barSpacing) + barSpacing / 2; // Use barSpacing for positioning
             const price = isHigh ? bar.high : bar.low;
             let y = this.chartBase.priceToY(price, adjustedMaxPrice, priceRange) - panY;
             
@@ -102,7 +102,7 @@ class ChartOverlays {
     }
     
     // Draw crosshair with X and Y axis values
-    drawCrosshair(data, mouseX, mouseY, priceScaling, barWidth) {
+    drawCrosshair(data, mouseX, mouseY, priceScaling, barSpacing) {
         if (!this.chartBase.ctx || !this.chartBase.isInChartArea(mouseX, mouseY)) return;
         
         const ctx = this.chartBase.ctx;
@@ -133,7 +133,7 @@ class ChartOverlays {
         ctx.stroke();
         
         // Draw value labels
-        this.drawCrosshairLabels(data, mouseX, mouseY, shiftedMaxPrice, priceRange, barWidth, chartDimensions);
+        this.drawCrosshairLabels(data, mouseX, mouseY, shiftedMaxPrice, priceRange, barSpacing, chartDimensions);
         
         ctx.setLineDash([]);
     }
@@ -151,11 +151,11 @@ class ChartOverlays {
     }
     
     // Draw crosshair value labels
-    drawCrosshairLabels(data, mouseX, mouseY, shiftedMaxPrice, priceRange, barWidth, chartDimensions) {
+    drawCrosshairLabels(data, mouseX, mouseY, shiftedMaxPrice, priceRange, barSpacing, chartDimensions) {
         const ctx = this.chartBase.ctx;
         
         // Calculate bar index and price
-        const barIndex = Math.floor((mouseX - panX - this.chartBase.margin.left) / barWidth);
+        const barIndex = Math.floor((mouseX - panX - this.chartBase.margin.left) / barSpacing); // Use barSpacing for index calculation
         const price = shiftedMaxPrice - ((mouseY - this.chartBase.margin.top) / chartDimensions.height) * priceRange;
         
         // Draw value boxes
@@ -173,10 +173,7 @@ class ChartOverlays {
         // X-axis bar/time label
         this.drawTimeLabel(data, barIndex, mouseX);
         
-        // Draw OHLC tooltip if over valid bar
-        if (barIndex >= 0 && barIndex < data.length) {
-            this.drawOHLCTooltip(data[barIndex], mouseX, mouseY);
-        }
+        // REMOVED: OHLC tooltip on canvas - using HTML tooltip instead which shows bar numbers
     }
     
     // Draw time label on X-axis
@@ -215,67 +212,6 @@ class ChartOverlays {
         ctx.fillText(timeText, mouseX, this.chartBase.margin.top + chartDimensions.height + 18);
     }
     
-    // Draw OHLC tooltip
-    drawOHLCTooltip(bar, mouseX, mouseY) {
-        const ctx = this.chartBase.ctx;
-        
-        const tooltipLines = [
-            `O: ${bar.open.toFixed(2)}`,
-            `H: ${bar.high.toFixed(2)}`,
-            `L: ${bar.low.toFixed(2)}`,
-            `C: ${bar.close.toFixed(2)}`
-        ];
-        
-        if (bar.volume !== undefined) {
-            tooltipLines.push(`V: ${this.formatVolume(bar.volume)}`);
-        }
-        
-        // Calculate tooltip dimensions
-        const lineHeight = 16;
-        const padding = 8;
-        const maxWidth = Math.max(...tooltipLines.map(line => ctx.measureText(line).width));
-        const tooltipWidth = maxWidth + padding * 2;
-        const tooltipHeight = tooltipLines.length * lineHeight + padding * 2;
-        
-        // Position tooltip to avoid edges
-        let tooltipX = mouseX + 15;
-        let tooltipY = mouseY - tooltipHeight - 15;
-        
-        if (tooltipX + tooltipWidth > this.chartBase.canvas.width - 20) {
-            tooltipX = mouseX - tooltipWidth - 15;
-        }
-        if (tooltipY < 20) {
-            tooltipY = mouseY + 15;
-        }
-        
-        // Draw tooltip background
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.9)';
-        ctx.fillRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
-        
-        // Draw tooltip border
-        ctx.strokeStyle = '#666';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(tooltipX, tooltipY, tooltipWidth, tooltipHeight);
-        
-        // Draw tooltip text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px Arial';
-        ctx.textAlign = 'left';
-        
-        tooltipLines.forEach((line, index) => {
-            ctx.fillText(line, tooltipX + padding, tooltipY + padding + (index + 1) * lineHeight);
-        });
-    }
-    
-    // Format volume for tooltip display
-    formatVolume(volume) {
-        if (volume >= 1000000) {
-            return (volume / 1000000).toFixed(1) + 'M';
-        } else if (volume >= 1000) {
-            return (volume / 1000).toFixed(1) + 'K';
-        }
-        return volume.toString();
-    }
     
     // Draw trend lines
     drawTrendLines(trendLines, priceScaling, barWidth) {

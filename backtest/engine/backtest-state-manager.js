@@ -178,12 +178,13 @@ class BacktestStateManager {
     checkForNextDayGapEntries(currentDay) {
         this.state.levelStates.forEach((levelState, levelKey) => {
             // If level was traded and it's a new day, make it available for gap entries
+            // BUT preserve retest requirement if level needs revalidation
             if (levelState.status === 'traded' && 
                 levelState.lastTradeDay && 
                 levelState.lastTradeDay !== currentDay) {
                 
                 levelState.status = 'available';
-                levelState.needsRevalidation = false;
+                // DON'T clear needsRevalidation - retest requirement should persist across days
                 
                 if (window.debugLogger) {
                     window.debugLogger.pivot(`Next-day reset: ${levelKey} now available for gap entries`, {
@@ -193,7 +194,8 @@ class BacktestStateManager {
                     });
                 }
                 
-                console.log(`🌅 Next-day reset: ${levelKey} now available for gap entries (traded on ${levelState.lastTradeDay}, now ${currentDay})`);
+                const retestStatus = levelState.needsRevalidation ? ' - STILL NEEDS RETEST' : '';
+                console.log(`🌅 Next-day reset: ${levelKey} now available for gap entries (traded on ${levelState.lastTradeDay}, now ${currentDay})${retestStatus}`);
             }
         });
     }

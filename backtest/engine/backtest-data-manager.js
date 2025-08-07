@@ -40,6 +40,10 @@ class BacktestDataManager {
                 if (completedTrade) {
                     stateManager.addTrade(completedTrade);
                 }
+                
+                // CRITICAL FIX: Mark level for retest if it was a trailing exit
+                this.handleTrailingExitRetest(currentPosition, exitResult, stateManager);
+                
                 stateManager.clearCurrentPosition();
             }
         }
@@ -93,6 +97,10 @@ class BacktestDataManager {
                     if (completedTrade) {
                         stateManager.addTrade(completedTrade);
                     }
+                    
+                    // CRITICAL FIX: Mark level for retest if it was a trailing exit  
+                    this.handleTrailingExitRetest(newPosition, secondExitResult, stateManager);
+                    
                     stateManager.clearCurrentPosition();
                 }
             }
@@ -215,6 +223,38 @@ class BacktestDataManager {
             },
             dateRange: this.getDataStats(data)
         };
+    }
+    
+    // CRITICAL FIX: Handle trailing exit retest marking
+    handleTrailingExitRetest(position, exitResult, stateManager) {
+        // Check if this was a trailing stop exit that requires retest
+        if (!exitResult.exitReason || !position.tradedLevel || !position.levelType) {
+            return; // Not applicable
+        }
+        
+        const exitReason = exitResult.exitReason;
+        const isTrailingExit = exitReason.includes('Aggressive Trail') || 
+                               exitReason.includes('Trailing SPL') || 
+                               exitReason.includes('Trailing SPH');
+        
+        if (isTrailingExit) {
+            // Create level key same way as in state manager
+            const levelKey = `${position.levelType}_${position.tradedLevel.toFixed(2)}`;
+            const levelStates = stateManager.getLevelStates();
+            
+            // Mark the original level as needing revalidation
+            if (levelStates.has(levelKey)) {
+                const levelState = levelStates.get(levelKey);
+                levelState.needsRevalidation = true;
+                levelState.status = 'traded'; // Ensure it's marked as traded
+                
+                console.log(`🔄 TRAILING EXIT: Marked ${levelKey} for RETEST (${position.tradedLevel.toFixed(2)})`);
+                console.log(`   → Reason: ${exitReason}`);
+                console.log(`   → Future entries on this level blocked until price retraces and retests`);
+            } else {
+                console.warn(`Trailing exit: Level ${levelKey} not found in state for retest marking`);
+            }
+        }
     }
 }
 

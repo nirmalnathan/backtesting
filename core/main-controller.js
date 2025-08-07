@@ -215,17 +215,19 @@ function getBarAtPosition(x, y) {
     const margin = { top: 30, right: 20, bottom: 80, left: 80 };
     const chartWidth = canvas.width - margin.left - margin.right;
     
-    // Calculate bar width with zoom
-    const barWidth = Math.max(2, (chartWidth / window.chartData.length) * hZoom);
+    // Calculate bar spacing with zoom (matching chart-base.js logic)
+    const baseSpacing = (chartWidth / window.chartData.length) * hZoom;
+    const minSpacing = 8; // Minimum 8px spacing between bar centers
+    const barSpacing = Math.max(minSpacing, baseSpacing);
     
     // CRITICAL FIX: Adjust for panning correctly
     // The mouse position needs to account for pan offset
     const adjustedX = x - margin.left - window.panX;
     
-    // Calculate bar index
-    const barIndex = Math.floor(adjustedX / barWidth);
+    // Calculate bar index using barSpacing
+    const barIndex = Math.floor(adjustedX / barSpacing);
     
-    console.log(`Tooltip Debug: mouseX=${x}, adjustedX=${adjustedX}, barWidth=${barWidth}, barIndex=${barIndex}, panX=${window.panX}`);
+    console.log(`Tooltip Debug: mouseX=${x}, adjustedX=${adjustedX}, barSpacing=${barSpacing}, barIndex=${barIndex}, panX=${window.panX}`);
     
     if (barIndex >= 0 && barIndex < window.chartData.length) {
         console.log(`Found bar ${barIndex}:`, window.chartData[barIndex]);
